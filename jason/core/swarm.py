@@ -10,6 +10,10 @@ import datetime
 import json
 import subprocess
 import requests
+import uuid
+import hashlib
+import gzip
+import shutil
 from pathlib import Path
 from typing import TypedDict, List, Dict, Any, Optional, Tuple
 from jason.core.memory import MemoryManager
@@ -46,6 +50,10 @@ class SwarmManager:
         """Initialize SwarmManager with Gemini API key and config"""
         self.config = config or {}
         self.gemini_api_key = gemini_api_key  # Store API key as instance variable
+
+        # Pending user-confirmation plans (e.g., file cleanup/compression)
+        # plan_id -> {"type": str, "created_at": str, "operations": List[Dict[str, Any]]}
+        self.pending_plans: Dict[str, Dict[str, Any]] = {}
         
         # Load config values
         searxng_url = self.config.get('searxng_url', 'http://localhost:8080')
@@ -3190,6 +3198,65 @@ END:VCALENDAR"""
             
         except Exception:
             return []
+
+    def _workflow_automation(self, task: str) -> Dict[str, Any]:
+        """Route workflow requests to the appropriate deterministic workflow."""
+        try:
+            task_lower = (task or "").lower()
+
+            if any(keyword in task_lower for keyword in [
+                "book trip",
+                "book flight",
+                "book hotel",
+                "travel to",
+                "book a holiday",
+                "book holiday",
+                "book a vacation",
+                "book vacation",
+                "plan a holiday",
+                "plan a vacation",
+            ]):
+                return self._travel_booking_workflow(task)
+
+            if any(keyword in task_lower for keyword in [
+                "schedule",
+                "calendar",
+                "meeting",
+                "appointment",
+            ]):
+                return self._calendar_workflow(task)
+
+            if any(keyword in task_lower for keyword in [
+                "organise",
+                "organize",
+                "clean downloads",
+                "file management",
+                "clean up my files",
+                "clean up files",
+                "compress",
+                "compression",
+            ]):
+                return self._file_management_workflow(task)
+
+            if any(keyword in task_lower for keyword in [
+                "system maintenance",
+                "optimize",
+                "clean system",
+                "maintenance mode",
+            ]):
+                return self._maintenance_workflow(task)
+
+            return {
+                'success': False,
+                'message': 'No matching workflow found. Available workflows: travel booking, calendar scheduling, file management, system maintenance',
+                'actions': []
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Workflow automation error: {str(e)}',
+                'actions': []
+            }
     
     def _desktop_app_workflow(self, task: str) -> Dict[str, Any]:
         """Desktop app integration workflow"""
@@ -3203,7 +3270,8 @@ END:VCALENDAR"""
                 
             # Desktop app integration workflow
             elif any(keyword in task_lower for keyword in ["desktop app", "control app", "interact with", "clawdbot", "skywork", "access app"]):
-                result = self._desktop_app_workflow(task)
+                result['success'] = False
+                result['message'] = "Desktop app integration workflow is not available in zero-API mode."
                 
             # File management workflow
             elif any(keyword in task_lower for keyword in ["organize files", "clean downloads", "file management"]):
@@ -3434,82 +3502,173 @@ END:VCALENDAR"""
         return result
     
     def _file_management_workflow(self, task: str) -> Dict[str, Any]:
-        """Real file management workflow that actually organizes files"""
-        result = {'success': False, 'message': 'File organization completed', 'actions': []}
-        
-        actions = []
-        organized_count = 0
-        error_count = 0
-        
+        """File cleanup/organization workflow that ALWAYS asks for confirmation before making changes."""
+        result = {'success': False, 'message': 'File workflow prepared', 'actions': []}
+
         try:
-            # Define organization directories
-            home_dir = Path.home()
-            downloads_dir = home_dir / 'Downloads'
-            desktop_dir = home_dir / 'Desktop'
-            
-            # Create organization directories if they don't exist
-            org_dirs = {
-                'images': home_dir / 'Pictures' / 'Organized',
-                'documents': home_dir / 'Documents' / 'Organized', 
-                'videos': home_dir / 'Movies' / 'Organized',
-                'music': home_dir / 'Music' / 'Organized',
-                'archives': home_dir / 'Documents' / 'Archives',
-                'apps': home_dir / 'Applications' / 'Organized',
-                'other': home_dir / 'Documents' / 'Miscellaneous'
+            plan = self._build_file_cleanup_plan(task)
+            operations = plan.get('operations', [])
+
+            display_ops = [op for op in operations if op.get('op') != 'mkdir']
+
+            if not display_ops:
+                result['success'] = True
+                result['message'] = "No cleanup/compression actions detected as necessary."
+                result['actions'] = plan.get('actions', [])
+                return result
+
+            plan_id = str(uuid.uuid4())
+            self.pending_plans[plan_id] = {
+                'type': 'file_cleanup',
+                'created_at': datetime.datetime.utcnow().isoformat() + 'Z',
+                'operations': operations,
             }
-            
-            for dir_path in org_dirs.values():
-                dir_path.mkdir(parents=True, exist_ok=True)
-            
-            actions.append("📁 Created organization directories")
-            
-            # File type mappings
-            file_types = {
-                'images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg'],
-                'videos': ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.webm'],
-                'music': ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a'],
-                'documents': ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt', '.xls', '.xlsx', '.ppt', '.pptx'],
-                'archives': ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'],
-                'apps': ['.dmg', '.pkg', '.app', '.exe', '.msi']
-            }
-            
-            # Process Downloads folder
-            if downloads_dir.exists():
-                actions.append("🔍 Scanning Downloads folder...")
-                for file_path in downloads_dir.iterdir():
-                    if file_path.is_file():
-                        if self._organize_file(file_path, org_dirs, file_types):
-                            organized_count += 1
-                        else:
-                            error_count += 1
-            
-            # Process Desktop folder  
-            if desktop_dir.exists():
-                actions.append("🔍 Scanning Desktop folder...")
-                for file_path in desktop_dir.iterdir():
-                    if file_path.is_file():
-                        if self._organize_file(file_path, org_dirs, file_types):
-                            organized_count += 1
-                        else:
-                            error_count += 1
-            
-            actions.append(f"✅ Organized {organized_count} files")
-            if error_count > 0:
-                actions.append(f"⚠️  {error_count} files could not be organized")
-            
+
+            actions = []
+            actions.extend(plan.get('actions', []))
+            actions.append(f"\nProposed operations: {len(display_ops)}")
+
+            preview_limit = 20
+            for op in display_ops[:preview_limit]:
+                if op['op'] == 'move':
+                    actions.append(f"MOVE: {op['src']} -> {op['dst']}")
+                elif op['op'] == 'delete':
+                    actions.append(f"DELETE: {op['path']}")
+                elif op['op'] == 'compress_gzip':
+                    actions.append(f"COMPRESS: {op['src']} -> {op['dst']} (gzip, then remove original)")
+
+            if len(display_ops) > preview_limit:
+                actions.append(f"... and {len(display_ops) - preview_limit} more")
+
+            actions.append(f"\nTo proceed, reply: CONFIRM {plan_id}")
+            actions.append(f"To cancel, reply: CANCEL {plan_id}")
+
             result['success'] = True
-            result['message'] = f"Real file organization completed: {organized_count} files organized, {error_count} errors"
-            
+            result['message'] = "File cleanup/compression plan ready — awaiting your confirmation."
+            result['actions'] = actions
+            return result
+
         except Exception as e:
-            actions.append(f"❌ File organization failed: {str(e)}")
             result['success'] = False
-            result['message'] = f"File organization error: {str(e)}"
-        
-        result['actions'] = actions
-        return result
-    
-    def _organize_file(self, file_path: Path, org_dirs: Dict[str, Path], file_types: Dict[str, List[str]]) -> bool:
-        """Organize a single file into appropriate directory"""
+            result['message'] = f"File workflow planning error: {str(e)}"
+            result['actions'] = [f"❌ File workflow planning failed: {str(e)}"]
+            return result
+
+    def _build_file_cleanup_plan(self, task: str) -> Dict[str, Any]:
+        """Scan common locations and build a plan of safe operations without executing anything."""
+        home_dir = Path.home()
+        downloads_dir = home_dir / 'Downloads'
+        desktop_dir = home_dir / 'Desktop'
+
+        cfg_dirs = self.config.get('directories') or {}
+        logs_dir = Path(cfg_dirs.get('logs', 'logs/'))
+        if not logs_dir.is_absolute():
+            # Make relative logs directory relative to current project root if possible
+            try:
+                logs_dir = Path.cwd() / logs_dir
+            except Exception:
+                logs_dir = home_dir / logs_dir
+
+        org_dirs = {
+            'images': home_dir / 'Pictures' / 'Organized',
+            'documents': home_dir / 'Documents' / 'Organized',
+            'videos': home_dir / 'Movies' / 'Organized',
+            'music': home_dir / 'Music' / 'Organized',
+            'archives': home_dir / 'Documents' / 'Archives',
+            'apps': home_dir / 'Applications' / 'Organized',
+            'other': home_dir / 'Documents' / 'Miscellaneous'
+        }
+
+        file_types = {
+            'images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg'],
+            'videos': ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.webm'],
+            'music': ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a'],
+            'documents': ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt', '.xls', '.xlsx', '.ppt', '.pptx'],
+            'archives': ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'],
+            'apps': ['.dmg', '.pkg', '.app', '.exe', '.msi']
+        }
+
+        scan_dirs: List[Tuple[str, Path]] = []
+        if downloads_dir.exists():
+            scan_dirs.append(('Downloads', downloads_dir))
+        if desktop_dir.exists():
+            scan_dirs.append(('Desktop', desktop_dir))
+        if logs_dir.exists():
+            scan_dirs.append(('Logs', logs_dir))
+
+        actions: List[str] = []
+        operations: List[Dict[str, Any]] = []
+        actions.append("🔍 Scanning for file cleanup/compression opportunities (no changes will be made without confirmation)...")
+
+        # Ensure destination directories exist in plan (still not destructive)
+        for dir_path in org_dirs.values():
+            operations.append({'op': 'mkdir', 'path': str(dir_path)})
+
+        # Duplicate detection (sha256) per scan set
+        seen_hashes: Dict[str, str] = {}
+
+        def _sha256(path: Path, chunk_size: int = 1024 * 1024) -> Optional[str]:
+            try:
+                h = hashlib.sha256()
+                with open(path, 'rb') as f:
+                    while True:
+                        chunk = f.read(chunk_size)
+                        if not chunk:
+                            break
+                        h.update(chunk)
+                return h.hexdigest()
+            except Exception:
+                return None
+
+        for label, base_dir in scan_dirs:
+            actions.append(f"📂 Scanning {label}: {str(base_dir)}")
+            try:
+                for file_path in base_dir.iterdir():
+                    if not file_path.is_file():
+                        continue
+
+                    # Safety: never propose operations on hidden/metadata files or Office lock files
+                    name = file_path.name
+                    if name.startswith('.') or name.startswith('~$'):
+                        continue
+
+                    # Compression candidates: large .log or .txt logs in logs folder
+                    try:
+                        size = file_path.stat().st_size
+                    except Exception:
+                        size = 0
+
+                    if label == 'Logs' and file_path.suffix.lower() in ['.log', '.txt'] and size >= 1_000_000:
+                        dst = file_path.with_suffix(file_path.suffix + '.gz')
+                        operations.append({'op': 'compress_gzip', 'src': str(file_path), 'dst': str(dst)})
+                        continue
+
+                    # Duplicate candidates
+                    digest = _sha256(file_path)
+                    if digest:
+                        if digest in seen_hashes:
+                            # Keep the first seen file, propose delete for duplicate
+                            operations.append({'op': 'delete', 'path': str(file_path), 'reason': 'duplicate', 'same_as': seen_hashes[digest]})
+                            continue
+                        else:
+                            seen_hashes[digest] = str(file_path)
+
+                    # Organization candidates (Downloads/Desktop)
+                    if label in ['Downloads', 'Desktop']:
+                        move_op = self._plan_move_for_file(file_path, org_dirs, file_types)
+                        if move_op:
+                            operations.append(move_op)
+
+            except Exception as e:
+                actions.append(f"⚠️ Scan error in {label}: {str(e)}")
+
+        # Filter out mkdir operations from user preview but keep in plan
+        # (mkdir is safe; it will be executed only on confirmation)
+        actions.append("✓ Scan complete")
+        return {'actions': actions, 'operations': operations}
+
+    def _plan_move_for_file(self, file_path: Path, org_dirs: Dict[str, Path], file_types: Dict[str, List[str]]) -> Optional[Dict[str, Any]]:
+        """Compute a safe move operation (dry-run) for a file, if applicable."""
         try:
             file_ext = file_path.suffix.lower()
             
@@ -3631,6 +3790,17 @@ For now, I can provide basic guidance: Japan is an amazing destination! Consider
         # If zero-API mode is enabled, prioritize deterministic processing
         if zero_api_mode:
             command_lower = command.lower()
+
+            # Confirmation / cancellation for destructive operations
+            confirm_match = re.match(r"^\s*confirm\s+([A-Za-z0-9\-]+)\s*$", command, flags=re.IGNORECASE)
+            if confirm_match:
+                plan_id = confirm_match.group(1)
+                return self._apply_pending_plan(plan_id)
+
+            cancel_match = re.match(r"^\s*cancel\s+([A-Za-z0-9\-]+)\s*$", command, flags=re.IGNORECASE)
+            if cancel_match:
+                plan_id = cancel_match.group(1)
+                return self._cancel_pending_plan(plan_id)
             
             # Use advanced NLP to parse complex prompts
             parsed_command = self._parse_complex_prompt(command)
@@ -3678,8 +3848,8 @@ For now, I can provide basic guidance: Japan is an amazing destination! Consider
                 "organise and clean up my files",
                 "organize and clean up my files",
             ]):
-                workflow_result = self._workflow_automation(command)
-                response = f"Zero-API File Workflow: {workflow_result['message']}\n" + "\n".join(workflow_result['actions'])
+                workflow_result = self._file_management_workflow(command)
+                response = f"Zero-API File Workflow: {workflow_result['message']}\n" + "\n".join(workflow_result.get('actions', []))
                 result = response
             elif any(keyword in command_lower for keyword in ["vpn", "connect vpn", "disconnect vpn", "vpn status"]):
                 vpn_result = self._vpn_control('status' if 'status' in command_lower else 'connect' if 'connect' in command_lower else 'disconnect')
