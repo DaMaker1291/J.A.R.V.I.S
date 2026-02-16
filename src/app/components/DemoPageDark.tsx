@@ -120,7 +120,7 @@ Cleanup complete! Freed 1.08 GB of space.`,
     },
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isProcessing) return;
 
@@ -136,37 +136,49 @@ Cleanup complete! Freed 1.08 GB of space.`,
 
     setInput("");
 
-    setTimeout(() => {
-      let response = commandResponses[command];
-      
-      if (!response) {
-        if (command.toLowerCase().startsWith("app launch")) {
-          const appName = command.substring(11).trim();
-          response = {
-            output: `✓ Launching ${appName}...\n✓ Application started successfully\nProcess ID: ${Math.floor(Math.random() * 10000)}`,
-            type: "success"
-          };
-        } else {
-          response = {
-            output: `Command not recognized: "${command}"\nType 'help' to see available commands.`,
-            type: "error"
-          };
-        }
+    try {
+      const response = await fetch('http://127.0.0.1:8000/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          command: command,
+          require_clarification: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      const data = await response.json();
+      
       setHistory(prev => {
         const newHistory = [...prev];
         newHistory[newHistory.length - 1] = {
           command,
-          output: response.output,
+          output: typeof data.result === 'string' ? data.result : JSON.stringify(data.result, null, 2),
           timestamp: new Date().toLocaleTimeString(),
-          type: response.type
+          type: data.status === "success" ? "success" : "info"
         };
         return newHistory;
       });
-
+    } catch (error) {
+      console.error('Failed to execute command:', error);
+      setHistory(prev => {
+        const newHistory = [...prev];
+        newHistory[newHistory.length - 1] = {
+          command,
+          output: `Error: Failed to connect to J.A.S.O.N. Neural Core. Ensure backend is running.\n${error instanceof Error ? error.message : String(error)}`,
+          timestamp: new Date().toLocaleTimeString(),
+          type: "error"
+        };
+        return newHistory;
+      });
+    } finally {
       setIsProcessing(false);
-    }, 800);
+    }
   };
 
   useEffect(() => {

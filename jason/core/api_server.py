@@ -2,7 +2,8 @@
 J.A.S.O.N. API Server - FastAPI for local command execution
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
@@ -41,6 +42,17 @@ async def startup_event():
     # Managers are now lazy-loaded in the endpoints
     pass
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler to capture all errors"""
+    import traceback
+    error_detail = traceback.format_exc()
+    print(f"CRITICAL ERROR: {error_detail}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {str(exc)}", "traceback": error_detail}
+    )
+
 @app.post("/execute")
 async def execute_command(request: CommandRequest):
     """Execute a command through J.A.S.O.N."""
@@ -51,11 +63,15 @@ async def execute_command(request: CommandRequest):
             swarm_manager = SwarmManager()
 
         # Execute task through LangGraph
+        print(f"Executing command: {request.command}")
         result = swarm_manager.execute_task(request.command)
+        print(f"Execution result: {result}")
 
         return {"result": result, "status": "success"}
 
     except Exception as e:
+        import traceback
+        print(f"Error in execute_command: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Execution failed: {str(e)}")
 
 @app.post("/clarify")
