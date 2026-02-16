@@ -14,6 +14,8 @@ export default defineConfig({
   base: '/J.A.R.V.I.S/',
   build: {
     sourcemap: false,
+    outDir: 'docs',
+    emptyOutDir: true,
   },
   assetsInclude: ['**/*.svg', '**/*.csv'],
 })
