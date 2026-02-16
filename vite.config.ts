@@ -12,12 +12,8 @@ export default defineConfig({
     tailwindcss(),
   ],
   base: '/J.A.R.V.I.S/',
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL('./src', import.meta.url)),
-    },
+  build: {
+    sourcemap: false,
   },
-
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 })
