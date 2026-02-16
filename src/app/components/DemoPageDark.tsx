@@ -124,10 +124,18 @@ Cleanup complete! Freed 1.08 GB of space.`,
   useEffect(() => {
     // Check backend availability on component mount
     const checkBackend = async () => {
+      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+      if (!apiBase) {
+        setBackendAvailable(false);
+        return;
+      }
       try {
-        const response = await fetch('http://127.0.0.1:8000/status', {
-          timeout: 5000
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(`${apiBase.replace(/\/$/, '')}/status`, {
+          signal: controller.signal,
         });
+        window.clearTimeout(timeoutId);
         setBackendAvailable(response.ok);
       } catch (error) {
         setBackendAvailable(false);
@@ -190,7 +198,11 @@ Cleanup complete! Freed 1.08 GB of space.`,
 
     // Backend is available, use real API
     try {
-      const response = await fetch('http://127.0.0.1:8000/execute', {
+      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+      if (!apiBase) {
+        throw new Error('Backend is not configured');
+      }
+      const response = await fetch(`${apiBase.replace(/\/$/, '')}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

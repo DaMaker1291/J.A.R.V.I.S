@@ -5,6 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  root: 'src',
   plugins: [
     // The React and Tailwind plugins are both required for Make, even if
     // Tailwind is not being actively used – do not remove them
@@ -12,9 +13,14 @@ export default defineConfig({
     tailwindcss(),
   ],
   base: '/J.A.R.V.I.S/',
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   build: {
     sourcemap: false,
-    outDir: 'docs',
+    outDir: '../docs',
     emptyOutDir: true,
   },
   assetsInclude: ['**/*.svg', '**/*.csv'],

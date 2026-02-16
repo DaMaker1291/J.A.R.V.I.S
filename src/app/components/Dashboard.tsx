@@ -47,8 +47,13 @@ export function Dashboard() {
   }, []);
 
   const checkBackendStatus = async () => {
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+    if (!apiBase) {
+      setBackendStatus('disconnected');
+      return;
+    }
     try {
-      const response = await fetch('http://127.0.0.1:8000/status');
+      const response = await fetch(`${apiBase.replace(/\/$/, '')}/status`);
       if (response.ok) {
         setBackendStatus('connected');
       } else {
@@ -60,8 +65,12 @@ export function Dashboard() {
   };
 
   const executeCommand = async (command: string) => {
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+    if (!apiBase) {
+      return { error: 'Backend is not configured' };
+    }
     try {
-      const response = await fetch('http://127.0.0.1:8000/execute', {
+      const response = await fetch(`${apiBase.replace(/\/$/, '')}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
