@@ -3652,9 +3652,34 @@ For now, I can provide basic guidance: Japan is an amazing destination! Consider
                 response = self._execute_automation_workflow(parsed_command)
                 result = response
             # Direct deterministic command handling
-            elif any(keyword in command_lower for keyword in ["book trip", "book flight", "book hotel", "travel to"]):
+            elif any(keyword in command_lower for keyword in [
+                "book trip",
+                "book flight",
+                "book hotel",
+                "travel to",
+                "book a holiday",
+                "book holiday",
+                "book a vacation",
+                "book vacation",
+                "plan a holiday",
+                "plan a vacation",
+            ]):
                 workflow_result = self._workflow_automation(command)
                 response = f"Zero-API Travel Workflow: {workflow_result['message']}\n" + "\n".join(workflow_result['actions'])
+                result = response
+            elif any(keyword in command_lower for keyword in [
+                "organise files",
+                "organize files",
+                "organise my files",
+                "organize my files",
+                "clean up my files",
+                "clean up files",
+                "tidy files",
+                "organise and clean up my files",
+                "organize and clean up my files",
+            ]):
+                workflow_result = self._workflow_automation(command)
+                response = f"Zero-API File Workflow: {workflow_result['message']}\n" + "\n".join(workflow_result['actions'])
                 result = response
             elif any(keyword in command_lower for keyword in ["vpn", "connect vpn", "disconnect vpn", "vpn status"]):
                 vpn_result = self._vpn_control('status' if 'status' in command_lower else 'connect' if 'connect' in command_lower else 'disconnect')

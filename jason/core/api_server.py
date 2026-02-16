@@ -9,14 +9,24 @@ from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import uvicorn
 import threading
+import os
+from pathlib import Path
+
+import yaml
 
 app = FastAPI(title="J.A.S.O.N. API", description="Local execution API for J.A.S.O.N.")
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
-    allow_credentials=True,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+    ],
+    allow_origin_regex=r"https://.*\\.github\\.io$",
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -35,6 +45,25 @@ swarm_manager = None
 vision_manager = None
 audio_manager = None
 overlay = None
+
+
+def _load_config() -> Dict[str, Any]:
+    config_path = Path("config.yaml")
+    if config_path.exists():
+        with open(config_path, "r") as f:
+            data = yaml.safe_load(f) or {}
+            return data if isinstance(data, dict) else {}
+    return {}
+
+
+def _get_gemini_api_key(config: Dict[str, Any]) -> str:
+    env_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if env_key and env_key.strip():
+        return env_key.strip()
+    cfg_key = (config.get("api_keys") or {}).get("gemini")
+    if isinstance(cfg_key, str) and cfg_key.strip():
+        return cfg_key.strip()
+    return ""
 
 @app.on_event("startup")
 async def startup_event():
@@ -59,14 +88,14 @@ async def execute_command(request: CommandRequest):
     try:
         global swarm_manager
         if swarm_manager is None:
-            # Initialize with Gemini API key for real AI functionality
-            gemini_api_key = "AIzaSyClGKxYkFkDcZnK4kpnKRImphZhd0BrGn8"
             from jason.core.swarm import SwarmManager
-            swarm_manager = SwarmManager(gemini_api_key=gemini_api_key)
+            config = _load_config()
+            gemini_api_key = _get_gemini_api_key(config)
+            swarm_manager = SwarmManager(gemini_api_key=gemini_api_key, config=config)
 
         # Execute task through LangGraph
         print(f"Executing command: {request.command}")
-        result = swarm_manager.execute_task(request.command)
+        result = swarm_manager.process_command(request.command)
         print(f"Execution result: {result}")
 
         return {"result": result, "status": "success"}
@@ -82,10 +111,10 @@ async def clarify_command(request: ClarificationRequest):
     try:
         global swarm_manager
         if swarm_manager is None:
-            # Initialize with Gemini API key for real AI functionality
-            gemini_api_key = "AIzaSyClGKxYkFkDcZnK4kpnKRImphZhd0BrGn8"
             from jason.core.swarm import SwarmManager
-            swarm_manager = SwarmManager(gemini_api_key=gemini_api_key)
+            config = _load_config()
+            gemini_api_key = _get_gemini_api_key(config)
+            swarm_manager = SwarmManager(gemini_api_key=gemini_api_key, config=config)
 
         # Update task with clarification
         # This would need to be integrated with the LangGraph state management
