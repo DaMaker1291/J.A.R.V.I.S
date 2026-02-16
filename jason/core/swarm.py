@@ -71,6 +71,9 @@ class SwarmManager:
         else:
             self.desktop_controller = None
 
+        self.system_monitor = None
+        self._init_system_monitor()
+
         # Setup Claude client
         self.claude = None
         if claude_api_key and claude_api_key.strip() and claude_available:
@@ -2536,6 +2539,414 @@ END:VCALENDAR"""
                 'success': False,
                 'error': f'Desktop calendar integration error: {str(e)}'
             }
+        """Initialize system monitoring capabilities"""
+        try:
+            import psutil
+            self.system_monitor = {
+                'psutil_available': True,
+                'cpu_count': psutil.cpu_count(),
+                'memory_total': psutil.virtual_memory().total,
+                'disk_usage': {},
+                'network_interfaces': psutil.net_if_addrs()
+            }
+            
+            # Get disk usage for all mounted drives
+            for partition in psutil.disk_partitions():
+                try:
+                    usage = psutil.disk_usage(partition.mountpoint)
+                    self.system_monitor['disk_usage'][partition.mountpoint] = {
+                        'total': usage.total,
+                        'used': usage.used,
+                        'free': usage.free,
+                        'percent': usage.percent
+                    }
+                except:
+                    pass
+                    
+        except ImportError:
+            self.system_monitor = {'psutil_available': False}
+    
+    def _get_system_status(self) -> Dict[str, Any]:
+        """Get comprehensive system status information"""
+        try:
+            import psutil
+            
+            cpu_percent = psutil.cpu_percent(interval=1, percpu=True)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            network = psutil.net_io_counters()
+            
+            return {
+                'cpu': {
+                    'usage_percent': cpu_percent,
+                    'average_usage': sum(cpu_percent) / len(cpu_percent),
+                    'cores': len(cpu_percent)
+                },
+                'memory': {
+                    'total_gb': round(memory.total / (1024**3), 2),
+                    'used_gb': round(memory.used / (1024**3), 2),
+                    'free_gb': round(memory.available / (1024**3), 2),
+                    'usage_percent': memory.percent
+                },
+                'disk': {
+                    'total_gb': round(disk.total / (1024**3), 2),
+                    'used_gb': round(disk.used / (1024**3), 2),
+                    'free_gb': round(disk.free / (1024**3), 2),
+                    'usage_percent': disk.percent
+                },
+                'network': {
+                    'bytes_sent': network.bytes_sent,
+                    'bytes_recv': network.bytes_recv,
+                    'packets_sent': network.packets_sent,
+                    'packets_recv': network.packets_recv
+                },
+                'processes': {
+                    'total': len(psutil.pids()),
+                    'running': len([p for p in psutil.process_iter(['status']) if p.info['status'] == 'running'])
+                }
+            }
+        except Exception as e:
+            return {
+                'error': f'System monitoring error: {str(e)}',
+                'cpu': {'usage_percent': 'N/A'},
+                'memory': {'usage_percent': 'N/A'},
+                'disk': {'usage_percent': 'N/A'}
+            }
+    
+    def _manage_processes(self, action: str, process_name: str = None, pid: int = None) -> Dict[str, Any]:
+        """Advanced process management capabilities"""
+        try:
+            import psutil
+            
+            if action == 'list':
+                processes = []
+                for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'status']):
+                    try:
+                        pinfo = proc.info
+                        processes.append({
+                            'pid': pinfo['pid'],
+                            'name': pinfo['name'],
+                            'cpu_percent': pinfo['cpu_percent'] or 0,
+                            'memory_percent': pinfo['memory_percent'] or 0,
+                            'status': pinfo['status']
+                        })
+                    except:
+                        continue
+                
+                # Sort by CPU usage descending
+                processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
+                return {
+                    'success': True,
+                    'processes': processes[:20],  # Top 20 processes
+                    'total_processes': len(processes)
+                }
+            
+            elif action == 'kill' and (process_name or pid):
+                killed = []
+                
+                if pid:
+                    try:
+                        proc = psutil.Process(pid)
+                        proc.terminate()
+                        killed.append(f'PID {pid} ({proc.name()})')
+                    except:
+                        return {'success': False, 'error': f'Could not terminate process {pid}'}
+                
+                if process_name:
+                    for proc in psutil.process_iter(['pid', 'name']):
+                        try:
+                            if process_name.lower() in proc.info['name'].lower():
+                                proc.terminate()
+                                killed.append(f'PID {proc.info["pid"]} ({proc.info["name"]})')
+                        except:
+                            continue
+                
+                return {
+                    'success': True,
+                    'message': f'Terminated processes: {", ".join(killed)}',
+                    'terminated_count': len(killed)
+                }
+            
+            elif action == 'details' and pid:
+                try:
+                    proc = psutil.Process(pid)
+                    return {
+                        'success': True,
+                        'process': {
+                            'pid': pid,
+                            'name': proc.name(),
+                            'exe': proc.exe(),
+                            'cwd': proc.cwd(),
+                            'cpu_percent': proc.cpu_percent(),
+                            'memory_percent': proc.memory_percent(),
+                            'status': proc.status(),
+                            'create_time': proc.create_time(),
+                            'num_threads': proc.num_threads()
+                        }
+                    }
+                except:
+                    return {'success': False, 'error': f'Could not get details for process {pid}'}
+            
+            else:
+                return {'success': False, 'error': f'Invalid action: {action}'}
+                
+        except Exception as e:
+            return {'success': False, 'error': f'Process management error: {str(e)}'}
+    
+    def _advanced_window_management(self, action: str, app_name: str = None, window_title: str = None) -> Dict[str, Any]:
+        """Advanced window management like professional desktop automation tools"""
+        try:
+            if action == 'list_windows':
+                script = '''
+                tell application "System Events"
+                    set windowList to {}
+                    repeat with p in processes
+                        if background only of p is false then
+                            repeat with w in windows of p
+                                set end of windowList to {process:name of p, title:name of w, position:position of w, size:size of w, visible:visible of w}
+                            end repeat
+                        end if
+                    end repeat
+                    return windowList
+                end tell
+                '''
+                
+                result = self._execute_applescript(script)
+                if result['success']:
+                    # Parse the AppleScript result
+                    windows = []
+                    if result.get('output'):
+                        # This would need parsing of AppleScript output
+                        windows = result['output'].split('\n')
+                    
+                    return {
+                        'success': True,
+                        'windows': windows,
+                        'total_windows': len(windows)
+                    }
+                else:
+                    return {'success': False, 'error': result.get('error', 'Failed to list windows')}
+            
+            elif action == 'arrange_windows':
+                # Arrange windows in a grid layout
+                script = f'''
+                tell application "System Events"
+                    set allWindows to windows of processes whose background only is false
+                    
+                    -- Arrange in grid pattern
+                    set screenBounds to bounds of window of desktop
+                    set screenWidth to item 3 of screenBounds
+                    set screenHeight to item 4 of screenBounds
+                    
+                    -- Simple 2x2 grid for now
+                    repeat with i from 1 to count of allWindows
+                        set w to item i of allWindows
+                        if i = 1 then
+                            set position of w to {{0, 22}}
+                            set size of w to {{screenWidth / 2, screenHeight / 2}}
+                        else if i = 2 then
+                            set position of w to {{screenWidth / 2, 22}}
+                            set size of w to {{screenWidth / 2, screenHeight / 2}}
+                        else if i = 3 then
+                            set position of w to {{0, screenHeight / 2 + 22}}
+                            set size of w to {{screenWidth / 2, screenHeight / 2}}
+                        else if i = 4 then
+                            set position of w to {{screenWidth / 2, screenHeight / 2 + 22}}
+                            set size of w to {{screenWidth / 2, screenHeight / 2}}
+                        end if
+                    end repeat
+                end tell
+                '''
+                
+                result = self._execute_applescript(script)
+                return {
+                    'success': result['success'],
+                    'message': 'Windows arranged in grid layout' if result['success'] else result.get('error', 'Failed to arrange windows')
+                }
+            
+            elif action == 'focus_window' and (app_name or window_title):
+                if app_name:
+                    script = f'tell application "{app_name}" to activate'
+                else:
+                    # Focus by window title (more complex AppleScript needed)
+                    script = f'''
+                    tell application "System Events"
+                        set targetWindow to first window whose name contains "{window_title}"
+                        perform action "AXRaise" of targetWindow
+                    end tell
+                    '''
+                
+                result = self._execute_applescript(script)
+                return {
+                    'success': result['success'],
+                    'message': f'Focused window: {app_name or window_title}' if result['success'] else result.get('error', 'Failed to focus window')
+                }
+            
+            else:
+                return {'success': False, 'error': f'Invalid window action: {action}'}
+                
+        except Exception as e:
+            return {'success': False, 'error': f'Window management error: {str(e)}'}
+    
+    def _network_monitoring(self) -> Dict[str, Any]:
+        """Network monitoring and control capabilities"""
+        try:
+            import psutil
+            
+            net_io = psutil.net_io_counters()
+            net_if_addrs = psutil.net_if_addrs()
+            net_if_stats = psutil.net_if_stats()
+            
+            interfaces = {}
+            for interface_name, addresses in net_if_addrs.items():
+                interfaces[interface_name] = {
+                    'addresses': [{'address': addr.address, 'netmask': addr.netmask, 'broadcast': addr.broadcast} 
+                                for addr in addresses if addr.address],
+                    'stats': {}
+                }
+                
+                if interface_name in net_if_stats:
+                    stats = net_if_stats[interface_name]
+                    interfaces[interface_name]['stats'] = {
+                        'isup': stats.isup,
+                        'duplex': stats.duplex,
+                        'speed': stats.speed,
+                        'mtu': stats.mtu
+                    }
+            
+            return {
+                'success': True,
+                'network_io': {
+                    'bytes_sent': net_io.bytes_sent,
+                    'bytes_recv': net_io.bytes_recv,
+                    'packets_sent': net_io.packets_sent,
+                    'packets_recv': net_io.packets_recv,
+                    'errin': net_io.errin,
+                    'errout': net_io.errout,
+                    'dropin': net_io.dropin,
+                    'dropout': net_io.dropout
+                },
+                'interfaces': interfaces
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': f'Network monitoring error: {str(e)}'}
+    
+    def _automation_workflows(self, workflow_type: str, parameters: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Advanced automation workflows like professional desktop tools"""
+        try:
+            if workflow_type == 'system_maintenance':
+                # Automated system cleanup and optimization
+                results = []
+                
+                # Clear system caches
+                cache_clear = subprocess.run(['sudo', 'purge'], capture_output=True, text=True)
+                results.append({
+                    'action': 'Clear system cache',
+                    'success': cache_clear.returncode == 0,
+                    'output': cache_clear.stdout if cache_clear.returncode == 0 else cache_clear.stderr
+                })
+                
+                # Check disk space and suggest cleanup
+                disk_usage = self._get_system_status().get('disk', {})
+                if disk_usage.get('usage_percent', 0) > 80:
+                    results.append({
+                        'action': 'Disk usage warning',
+                        'message': f'Disk usage is {disk_usage["usage_percent"]}%. Consider cleanup.',
+                        'usage': disk_usage
+                    })
+                
+                return {
+                    'success': True,
+                    'workflow': 'system_maintenance',
+                    'results': results,
+                    'completed_at': datetime.datetime.now().isoformat()
+                }
+            
+            elif workflow_type == 'productivity_boost':
+                # Productivity enhancement workflow
+                results = []
+                
+                # Close distracting applications
+                distracting_apps = ['Safari', 'Mail', 'Messages']  # Example
+                for app in distracting_apps:
+                    close_result = self._control_desktop_app(app, 'quit')
+                    results.append({
+                        'action': f'Close {app}',
+                        'success': close_result.get('success', False),
+                        'message': close_result.get('message', close_result.get('error', 'Unknown'))
+                    })
+                
+                # Open productivity apps
+                productivity_apps = ['Terminal', 'TextEdit', 'Calendar']
+                for app in productivity_apps:
+                    launch_result = self._control_desktop_app(app, 'launch')
+                    results.append({
+                        'action': f'Launch {app}',
+                        'success': launch_result.get('success', False),
+                        'message': launch_result.get('message', launch_result.get('error', 'Unknown'))
+                    })
+                
+                # Arrange windows for productivity
+                arrange_result = self._advanced_window_management('arrange_windows')
+                results.append({
+                    'action': 'Arrange windows productively',
+                    'success': arrange_result.get('success', False),
+                    'message': arrange_result.get('message', arrange_result.get('error', 'Unknown'))
+                })
+                
+                return {
+                    'success': True,
+                    'workflow': 'productivity_boost',
+                    'results': results,
+                    'completed_at': datetime.datetime.now().isoformat()
+                }
+            
+            elif workflow_type == 'security_scan':
+                # Security monitoring workflow
+                results = []
+                
+                # Check for suspicious processes
+                process_result = self._manage_processes('list')
+                if process_result['success']:
+                    suspicious = []
+                    for proc in process_result['processes'][:10]:  # Check top 10
+                        if proc['cpu_percent'] > 50 or proc['memory_percent'] > 20:
+                            suspicious.append(proc)
+                    
+                    results.append({
+                        'action': 'Check for resource-intensive processes',
+                        'suspicious_processes': suspicious,
+                        'count': len(suspicious)
+                    })
+                
+                # Network monitoring
+                network_result = self._network_monitoring()
+                if network_result['success']:
+                    results.append({
+                        'action': 'Network monitoring',
+                        'connections': len(network_result.get('interfaces', {})),
+                        'network_io': network_result['network_io']
+                    })
+                
+                return {
+                    'success': True,
+                    'workflow': 'security_scan',
+                    'results': results,
+                    'completed_at': datetime.datetime.now().isoformat()
+                }
+            
+            else:
+                return {
+                    'success': False,
+                    'error': f'Unknown workflow type: {workflow_type}'
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Automation workflow error: {str(e)}'
+            }
     
     def _open_calendar_app(self) -> Dict[str, Any]:
         """Open Calendar.app for manual event creation/review"""
@@ -2657,6 +3068,8 @@ END:VCALENDAR"""
                 'success': False,
                 'error': f'BusyCal integration error: {str(e)}'
             }
+    
+    def _get_calendar_entries(self, date: str = None) -> List[Dict[str, Any]]:
         """Get calendar entries for a specific date or all entries"""
         try:
             calendar_dir = Path.home() / '.jason' / 'calendar'
@@ -2679,6 +3092,9 @@ END:VCALENDAR"""
             
         except Exception:
             return []
+    
+    def _desktop_app_workflow(self, task: str) -> Dict[str, Any]:
+        """Desktop app integration workflow"""
         try:
             task_lower = task.lower()
             result = {'success': False, 'message': '', 'actions': []}
@@ -3153,30 +3569,113 @@ For now, I can provide basic guidance: Japan is an amazing destination! Consider
                     response = f"Zero-API Web Search Results:\n" + "\n".join([f"- {r['title']} ({r['url']})" for r in search_result['results'][:3]])
                 else:
                     response = f"Zero-API Search Error: {search_result.get('error', 'Search failed')}"
+            elif any(keyword in command_lower for keyword in ["system status", "system info", "computer status", "performance"]):
+                system_result = self._get_system_status()
+                response = f"🖥️ System Status Report:\n"
+                response += f"CPU: {system_result['cpu']['average_usage']:.1f}% average ({system_result['cpu']['cores']} cores)\n"
+                response += f"Memory: {system_result['memory']['used_gb']}GB/{system_result['memory']['total_gb']}GB ({system_result['memory']['usage_percent']}%) \n"
+                response += f"Disk: {system_result['disk']['used_gb']}GB/{system_result['disk']['total_gb']}GB ({system_result['disk']['usage_percent']}%) \n"
+                response += f"Processes: {system_result['processes']['running']}/{system_result['processes']['total']} running\n"
+                response += f"Network: {system_result['network']['bytes_sent']} bytes sent, {system_result['network']['bytes_recv']} bytes received"
                 result = response
-            else:
-                # Use LangGraph for other deterministic processing with complex prompt context
-                try:
-                    initial_state = SwarmState(
-                        messages=[{"role": "user", "content": command}],
-                        current_agent="",
-                        confidence=0.0,
-                        clarification_needed=False,
-                        task=command,
-                        response="",
-                        options=[]
-                    )
-                    
-                    # Enhance state with parsed complex prompt data
-                    initial_state["complexity"] = parsed_command.get('complexity', 'simple')
-                    initial_state["intent"] = parsed_command.get('intent', 'unknown')
-                    initial_state["entities"] = parsed_command.get('entities', {})
-                    
-                    final_state = self.graph.invoke(initial_state)
-                    response = final_state.get("response", f"Zero-API Processing: {command}")
-                    result = response
-                except Exception as e:
-                    result = f"Zero-API Processing: {command} (Complex analysis complete - {parsed_command['complexity']} complexity, {parsed_command['intent']} intent detected)"
+            
+            elif any(keyword in command_lower for keyword in ["list processes", "show processes", "process list", "running apps"]):
+                process_result = self._manage_processes('list')
+                if process_result['success']:
+                    response = f"📊 Top {len(process_result['processes'])} Processes by CPU Usage:\n"
+                    for i, proc in enumerate(process_result['processes'][:10], 1):
+                        response += f"{i}. {proc['name']} (PID: {proc['pid']}) - CPU: {proc['cpu_percent']:.1f}%, Memory: {proc['memory_percent']:.1f}%\n"
+                    response += f"\nTotal running processes: {process_result['total_processes']}"
+                else:
+                    response = f"❌ Process listing failed: {process_result.get('error', 'Unknown error')}"
+                result = response
+            
+            elif any(keyword in command_lower for keyword in ["kill process", "terminate process", "stop process"]) and ("pid" in command_lower or any(word.isdigit() for word in command_lower.split())):
+                # Extract PID from command
+                pid = None
+                for word in command_lower.split():
+                    if word.isdigit():
+                        pid = int(word)
+                        break
+                
+                if pid:
+                    kill_result = self._manage_processes('kill', pid=pid)
+                    if kill_result['success']:
+                        response = f"✅ Successfully terminated: {kill_result['message']}"
+                    else:
+                        response = f"❌ Failed to terminate process {pid}: {kill_result.get('error', 'Unknown error')}"
+                else:
+                    response = "❌ Please specify a process ID (PID) to terminate"
+                result = response
+            
+            elif any(keyword in command_lower for keyword in ["arrange windows", "organize windows", "tile windows", "grid windows"]):
+                arrange_result = self._advanced_window_management('arrange_windows')
+                if arrange_result['success']:
+                    response = f"✅ Windows arranged successfully: {arrange_result['message']}"
+                else:
+                    response = f"❌ Window arrangement failed: {arrange_result.get('error', 'Unknown error')}"
+                result = response
+            
+            elif any(keyword in command_lower for keyword in ["focus window", "switch to window", "activate window"]):
+                # Try to extract app name from command
+                app_name = None
+                for word in command_lower.split():
+                    if word[0].isupper():  # Likely an app name
+                        app_name = word
+                        break
+                
+                if app_name:
+                    focus_result = self._advanced_window_management('focus_window', app_name=app_name)
+                    if focus_result['success']:
+                        response = f"✅ Focused window: {focus_result['message']}"
+                    else:
+                        response = f"❌ Failed to focus window: {focus_result.get('error', 'Unknown error')}"
+                else:
+                    response = "❌ Please specify which application window to focus"
+                result = response
+            
+            elif any(keyword in command_lower for keyword in ["productivity mode", "focus mode", "work mode", "distraction free"]):
+                workflow_result = self._automation_workflows('productivity_boost')
+                if workflow_result['success']:
+                    response = "🚀 Productivity Mode Activated!\n"
+                    for action_result in workflow_result['results']:
+                        status = "✅" if action_result['success'] else "❌"
+                        response += f"{status} {action_result['action']}: {action_result['message']}\n"
+                else:
+                    response = f"❌ Productivity mode failed: {workflow_result.get('error', 'Unknown error')}"
+                result = response
+            
+            elif any(keyword in command_lower for keyword in ["system maintenance", "cleanup system", "optimize system", "maintenance mode"]):
+                workflow_result = self._automation_workflows('system_maintenance')
+                if workflow_result['success']:
+                    response = "🔧 System Maintenance Completed!\n"
+                    for action_result in workflow_result['results']:
+                        status = "✅" if action_result['success'] else "⚠️"
+                        response += f"{status} {action_result['action']}: {action_result.get('message', 'Completed')}\n"
+                else:
+                    response = f"❌ System maintenance failed: {workflow_result.get('error', 'Unknown error')}"
+                result = response
+            
+            elif any(keyword in command_lower for keyword in ["security scan", "security check", "scan system", "check security"]):
+                workflow_result = self._automation_workflows('security_scan')
+                if workflow_result['success']:
+                    response = "🔒 Security Scan Completed!\n"
+                    for action_result in workflow_result['results']:
+                        response += f"🛡️ {action_result['action']}:\n"
+                        if 'suspicious_processes' in action_result:
+                            suspicious = action_result['suspicious_processes']
+                            if suspicious:
+                                response += f"   ⚠️ Found {len(suspicious)} resource-intensive processes\n"
+                                for proc in suspicious[:3]:  # Show top 3
+                                    response += f"   - {proc['name']} (PID: {proc['pid']}) CPU: {proc['cpu_percent']:.1f}%\n"
+                            else:
+                                response += "   ✅ No suspicious processes detected\n"
+                        if 'network_io' in action_result:
+                            net_io = action_result['network_io']
+                            response += f"   🌐 Network: {net_io['bytes_sent']} sent, {net_io['bytes_recv']} received\n"
+                else:
+                    response = f"❌ Security scan failed: {workflow_result.get('error', 'Unknown error')}"
+                result = response
         else:
             # Legacy API mode - try CrewAI first, then LangGraph
             if hasattr(self, 'use_crewai') and self.use_crewai and self.agents:

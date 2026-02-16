@@ -63,8 +63,8 @@ woob>=3.0
 radicale>=3.0.0
 caldav>=1.3.0
 
-# Network & Security
-scapy>=2.5.0
+# System Monitoring & Process Management
+psutil>=5.9.0
 
 # 3D Processing & Forge Protocol
 open3d>=0.18.0
