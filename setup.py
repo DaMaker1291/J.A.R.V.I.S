@@ -4,14 +4,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="jarvis-but-mine",
+    name="jason",
     version="0.1.0",
     author="DaMaker1291",
     author_email="your.email@example.com",
-    description="A customizable personal assistant inspired by J.A.R.V.I.S.",
+    description="A multi-agent autonomous ecosystem inspired by J.A.R.V.I.S.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/DaMaker1291/J.A.R.V.I.S-BUT-MINE",
+    url="https://github.com/DaMaker1291/J.A.S.O.N.",
     packages=find_packages(),
     include_package_data=True,
     package_data={
@@ -26,7 +26,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "jarvis=jarvis.__main__:cli",
+            "jason=jason.__main__:cli",
         ],
     },
     classifiers=[
