@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.S.O.N. - Professional Desktop Automation</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <span class="logo-icon">🤖</span>
+                <h1>J.A.S.O.N.</h1>
+                <p class="subtitle">Just A System Operating Network</p>
+            </div>
+            <nav class="nav">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#demo" class="nav-link">Demo</a>
+                <a href="#docs" class="nav-link">Documentation</a>
+                <a href="https://github.com/DaMaker1291/J.A.R.V.I.S" class="nav-link github-btn">GitHub</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h2>Professional Desktop Automation</h2>
+                <p class="hero-text">
+                    Experience desktop automation that rivals commercial tools like ClawdBot and SkyWork Desktop.
+                    Real functionality, zero APIs, complete system control.
+                </p>
+                <div class="hero-buttons">
+                    <button class="btn btn-primary" onclick="startDemo()">🚀 Start Demo</button>
+                    <button class="btn btn-secondary" onclick="showSystemStatus()">📊 System Status</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="features" class="features">
+            <div class="container">
+                <h2>🚀 Core Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🖥️</div>
+                        <h3>Desktop Integration</h3>
+                        <p>Launch, quit, and control desktop applications with precision. Native macOS automation via AppleScript.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📅</div>
+                        <h3>Native Scheduling</h3>
+                        <p>Create calendar events directly in Calendar.app, Fantastical, and BusyCal. No external APIs required.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3>System Monitoring</h3>
+                        <p>Real-time CPU, memory, disk, and network monitoring with detailed process management.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🪟</div>
+                        <h3>Window Management</h3>
+                        <p>Arrange windows in professional grid layouts, focus specific applications, and manage workspaces.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Automation Workflows</h3>
+                        <p>Productivity boosts, system maintenance, and security scanning with automated workflows.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔒</div>
+                        <h3>Zero-API Processing</h3>
+                        <p>Deterministic command execution without external dependencies. Real functionality, no mocks.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="demo" class="demo">
+            <div class="container">
+                <h2>🎮 Interactive Demo</h2>
+                <div class="demo-container">
+                    <div class="command-interface">
+                        <div class="command-history" id="commandHistory">
+                            <div class="command-line">Welcome to J.A.S.O.N. Professional Desktop Automation 🤖</div>
+                            <div class="command-line">Type a command below to see J.A.S.O.N. in action!</div>
+                        </div>
+                        <div class="command-input">
+                            <span class="prompt">J.A.S.O.N. ></span>
+                            <input type="text" id="commandInput" placeholder="system status" onkeypress="handleCommand(event)">
+                            <button onclick="executeCommand()" class="execute-btn">Execute</button>
+                        </div>
+                    </div>
+                    <div class="demo-results">
+                        <h3>📊 System Status</h3>
+                        <div class="status-display" id="statusDisplay">
+                            <div class="status-item">
+                                <span class="status-label">CPU Usage:</span>
+                                <span class="status-value" id="cpuUsage">--</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Memory:</span>
+                                <span class="status-value" id="memoryUsage">--</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Disk Usage:</span>
+                                <span class="status-value" id="diskUsage">--</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">Active Processes:</span>
+                                <span class="status-value" id="processCount">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="docs" class="docs">
+            <div class="container">
+                <h2>📚 Documentation</h2>
+                <div class="docs-grid">
+                    <div class="doc-section">
+                        <h3>Installation</h3>
+                        <pre><code>git clone https://github.com/DaMaker1291/J.A.R.V.I.S.git
+cd J.A.R.V.I.S
+pip install -r requirements.txt
+python3 -m jason</code></pre>
+                    </div>
+                    <div class="doc-section">
+                        <h3>Basic Commands</h3>
+                        <ul>
+                            <li><code>system status</code> - View system information</li>
+                            <li><code>list processes</code> - Show running processes</li>
+                            <li><code>arrange windows</code> - Organize windows in grid</li>
+                            <li><code>productivity mode</code> - Activate productivity workflow</li>
+                        </ul>
+                    </div>
+                    <div class="doc-section">
+                        <h3>Advanced Features</h3>
+                        <ul>
+                            <li><strong>Desktop App Control:</strong> Launch and manage applications</li>
+                            <li><strong>Native Scheduling:</strong> Create calendar events</li>
+                            <li><strong>Process Management:</strong> Kill and monitor processes</li>
+                            <li><strong>Security Scanning:</strong> Automated security checks</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 J.A.S.O.N. - Professional Desktop Automation. Built with ❤️ for power users.</p>
+            <div class="footer-links">
+                <a href="https://github.com/DaMaker1291/J.A.R.V.I.S">GitHub</a>
+                <a href="#features">Features</a>
+                <a href="#docs">Documentation</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
