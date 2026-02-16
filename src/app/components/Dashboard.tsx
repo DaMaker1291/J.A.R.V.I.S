@@ -39,6 +39,46 @@ export function Dashboard() {
     automations: 12,
   });
 
+  const [backendStatus, setBackendStatus] = useState('checking');
+
+  // Check backend status on mount
+  useEffect(() => {
+    checkBackendStatus();
+  }, []);
+
+  const checkBackendStatus = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/status');
+      if (response.ok) {
+        setBackendStatus('connected');
+      } else {
+        setBackendStatus('error');
+      }
+    } catch (error) {
+      setBackendStatus('disconnected');
+    }
+  };
+
+  const executeCommand = async (command: string) => {
+    try {
+      const response = await fetch('http://127.0.0.1:8000/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          command: command,
+          require_clarification: false,
+        }),
+      });
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Failed to execute command:', error);
+      return { error: 'Failed to connect to backend' };
+    }
+  };
+
   // Simulate real-time updates
   useEffect(() => {
     const interval = setInterval(() => {
@@ -268,9 +308,32 @@ export function Dashboard() {
             <div className="grid md:grid-cols-2 gap-4">
               {quickActions.map((action, index) => {
                 const Icon = action.icon;
+                const handleClick = async () => {
+                  let command = '';
+                  switch (action.label) {
+                    case 'Boost Productivity':
+                      command = 'boost productivity';
+                      break;
+                    case 'Arrange Windows':
+                      command = 'arrange windows in grid';
+                      break;
+                    case 'Create Event':
+                      command = 'create calendar event';
+                      break;
+                    case 'Run Command':
+                      command = 'show system status';
+                      break;
+                    default:
+                      command = action.label.toLowerCase();
+                  }
+                  const result = await executeCommand(command);
+                  console.log('Command result:', result);
+                  // You could add toast notifications here to show the result
+                };
                 return (
                   <motion.button
                     key={action.label}
+                    onClick={handleClick}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     className="group flex items-start gap-4 p-4 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-all text-left"

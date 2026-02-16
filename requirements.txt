@@ -3,72 +3,39 @@ python-dotenv>=0.19.0
 pyyaml>=6.0
 click>=8.0.0
 
-# Speech Recognition & Text-to-Speech
+# Speech Recognition & Text-to-Speech (Authorized: Gemini API for Whisper, Piper TTS for local synthesis)
 SpeechRecognition>=3.8.1
-pyttsx3>=2.90
-python-vlc>=3.0.11115
-elevenlabs>=0.2.0
+piper-tts>=1.2.0
 
-# AI & NLP
-openai>=0.27.0
-nltk>=3.6.3
-crewai>=0.1.0
-langchain>=0.0.300
-langchain-google-genai
-langgraph
+# AI & NLP (Authorized: Exclusive Gemini 2.5 Flash)
 google-generativeai>=0.3.0
+langchain-google-genai
 
-# AI/ML
-anthropic>=0.40.0
-
-# Vision & Image Processing
-fastapi
-uvicorn
-pyqt6
-openai-whisper
-pyaudio
-numpy
-scipy
-docker
-requests
-ollama
-broadlink
-librosa
-speechbrain
-ultralytics>=0.9.53
-Pillow>=9.3.0
-
-# Memory & Vector DB
-chromadb>=0.4.0
-
-# Holographic HUD
-flask>=2.3.0
-flask-socketio>=5.3.0
-
-# Web & API
+# Web & API (Authorized: Google API Client, CalDAV)
 requests>=2.26.0
-beautifulsoup4>=4.10.0
-fastapi>=0.68.0
-uvicorn>=0.15.0
-
-# Browser Automation & APIs
-playwright>=1.40.0
-plaid-python>=15.0.0
 google-api-python-client>=2.0.0
 google-auth-oauthlib>=1.0.0
-
-# Self-Hosted Sovereign Alternatives
-# kokoro-tts>=0.1.0  # Removed due to Python 3.13 incompatibility
-woob>=3.0
-radicale>=3.0.0
 caldav>=1.3.0
 
-# System Monitoring & Process Management
+# Browser Automation (Authorized: Playwright)
+playwright>=1.40.0
+
+# System Monitoring & Process Management (Authorized: psutil)
 psutil>=5.9.0
 
-# 3D Processing & Forge Protocol
-open3d>=0.18.0
-trimesh>=4.0.0
+# Network Intelligence (Authorized: scapy)
+scapy>=2.5.0
+
+# Physical Bridge (Authorized: pyautogui, platform-specific OS control)
+pyautogui>=0.9.53
+pyobjc>=9.0.0  # For macOS
+
+# Knowledge Base (Authorized: ChromaDB)
+chromadb>=0.4.0
+
+# Web Framework (Authorized: FastAPI for Neural Core)
+fastapi>=0.68.0
+uvicorn>=0.15.0
 
 # Development
 black>=21.12b0

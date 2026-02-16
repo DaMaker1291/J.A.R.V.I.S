@@ -6,7 +6,7 @@ import { MonitoringPageDark } from "./components/MonitoringPageDark";
 
 export const router = createBrowserRouter([
   {
-    path: "/",
+    path: "/J.A.R.V.I.S/",
     Component: RootLayout,
     children: [
       {

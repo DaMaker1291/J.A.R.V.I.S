@@ -74,3 +74,4 @@ data/
 .DS_Store
 .cache/
 .huggingface/
+node_modules

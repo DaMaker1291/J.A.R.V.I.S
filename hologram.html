@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.S.O.N. OMNI-6.1 Hologram HUD</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle, #000011 0%, #000000 100%);
+            font-family: 'Courier New', monospace;
+            color: #00f2ff;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hologram-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hologram-orb {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 242, 255, 0.8) 0%, rgba(255, 60, 0, 0.4) 50%, transparent 100%);
+            animation: pulse 2s infinite ease-in-out;
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 242, 255, 0.5);
+        }
+
+        .hologram-orb::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 242, 255, 0.9) 0%, transparent 70%);
+            animation: rotate 10s linear infinite;
+        }
+
+        .hologram-text {
+            position: absolute;
+            top: 60%;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 242, 255, 0.8);
+            animation: flicker 3s infinite;
+        }
+
+        .status-indicators {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00f2ff;
+            animation: blink 2s infinite;
+        }
+
+        .status-dot:nth-child(2) { animation-delay: 0.5s; }
+        .status-dot:nth-child(3) { animation-delay: 1s; }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        .mechanical-thrum {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
+            opacity: 0.6;
+            animation: thrum 1s infinite;
+        }
+
+        @keyframes thrum {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 0.9; }
+        }
+    </style>
+</head>
+<body>
+    <div class="hologram-container">
+        <div class="hologram-orb"></div>
+        <div class="hologram-text">
+            J.A.S.O.N. OMNI-6.1<br>
+            EXCLUSIVE SOURCE LOCKDOWN<br>
+            STARK-LEAN PROTOCOL
+        </div>
+    </div>
+
+    <div class="status-indicators">
+        <div class="status-dot" title="Gemini Neural Core"></div>
+        <div class="status-dot" title="Zero-API Operations"></div>
+        <div class="status-dot" title="System Integrity"></div>
+    </div>
+
+    <div class="mechanical-thrum">
+        [MECHANICAL THRUM ACTIVE]
+    </div>
+
+    <script>
+        // WebSocket connection for real-time sync
+        let ws;
+        let statusDots = document.querySelectorAll('.status-dot');
+
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8000/ws'); // Connect to FastAPI WebSocket
+
+            ws.onopen = function(event) {
+                console.log('Hologram HUD: WebSocket connected');
+                updateHologramStatus('connected');
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateHologramStatus(data.status);
+                updateHologramText(data.message);
+            };
+
+            ws.onclose = function(event) {
+                console.log('Hologram HUD: WebSocket disconnected');
+                updateHologramStatus('disconnected');
+                // Attempt to reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            };
+
+            ws.onerror = function(error) {
+                console.error('Hologram HUD: WebSocket error:', error);
+            };
+        }
+
+        function updateHologramStatus(status) {
+            statusDots.forEach((dot, index) => {
+                if (status === 'connected') {
+                    dot.style.background = '#00f2ff';
+                    dot.style.boxShadow = '0 0 10px rgba(0, 242, 255, 0.8)';
+                } else if (status === 'processing') {
+                    dot.style.background = '#ff3c00';
+                    dot.style.boxShadow = '0 0 10px rgba(255, 60, 0, 0.8)';
+                    dot.style.animation = 'blink 0.5s infinite';
+                } else {
+                    dot.style.background = '#666';
+                    dot.style.boxShadow = 'none';
+                }
+            });
+        }
+
+        function updateHologramText(message) {
+            const textElement = document.querySelector('.hologram-text');
+            if (message) {
+                textElement.innerHTML = `J.A.S.O.N. OMNI-6.1<br>${message}`;
+            }
+        }
+
+        // Initialize WebSocket connection
+        connectWebSocket();
+
+        // Low-frequency UI chirps for confirmation
+        function playUIChirp() {
+            // Create audio context for UI feedback
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        // Expose chirp function globally
+        window.playUIChirp = playUIChirp;
+    </script>
+</body>
+</html>

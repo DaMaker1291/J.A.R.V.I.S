@@ -28,21 +28,6 @@ from jason.core.cipher import CipherManager
 # CrewAI imports
 from crewai import Crew, Task
 
-# Claude integration
-try:
-    from anthropic import Anthropic
-    claude_available = True
-except ImportError:
-    claude_available = False
-
-# Ollama fallback support
-ollama_available = False
-try:
-    import ollama
-    ollama_available = True
-except ImportError:
-    pass
-
 class SwarmState(TypedDict):
     messages: List[Dict[str, Any]]
     current_agent: str
@@ -56,49 +41,25 @@ from crewai import Crew, Task, Agent
 class SwarmManager:
     """J.A.S.O.N. Swarm Manager with zero-API capabilities"""
 
-    def __init__(self, gemini_api_key: str = "", claude_api_key: str = "", config: Dict[str, Any] = None):
-        """Initialize SwarmManager with optional API keys and config"""
+    def __init__(self, gemini_api_key: str = "", config: Dict[str, Any] = None):
+        """Initialize SwarmManager with Gemini API key and config"""
         self.config = config or {}
         
         # Load config values
         searxng_url = self.config.get('searxng_url', 'http://localhost:8080')
-        zero_api_mode = self.config.get('zero_api_mode', True)
-
-        # Check for desktop integration settings
-        desktop_integration = self.config.get('desktop_integration', {})
-        if desktop_integration.get('enabled', False):
-            self.desktop_controller = self._init_desktop_controller()
-        else:
-            self.desktop_controller = None
-
         self.system_monitor = None
         self._init_system_monitor()
 
-        # Setup Claude client
-        self.claude = None
-        if claude_api_key and claude_api_key.strip() and claude_available:
-            self.claude = Anthropic(api_key=claude_api_key)
-            print(f"✓ Claude client initialized")
-        else:
-            print(f"✗ Claude client not initialized (no API key)")
+        # Initialize desktop controller for OS mastery
+        self.desktop_controller = self._init_desktop_controller()
 
-        # Setup Gemini LLM
+        # Setup Gemini LLM (Exclusive Neural Source)
         self.gemini_llm = None
         if gemini_api_key and gemini_api_key.strip():  # Check if API key is not empty
             self.gemini_llm = GoogleGenerativeAI(model="gemini-2.0-flash-exp", google_api_key=gemini_api_key)
             print(f"✓ Gemini LLM initialized")
         else:
             print(f"✗ Gemini LLM not initialized (no API key)")
-
-        # Setup Ollama fallback
-        self.ollama_llm = None
-        if ollama_available:
-            try:
-                # Check if Ollama is running
-                ollama.list()
-                self.ollama_llm = ollama
-            except:
-                pass
 
         # Initialize CrewAI agents
         self.agents = self._initialize_agents()
@@ -107,52 +68,42 @@ class SwarmManager:
         self.graph = self._build_graph()
 
     def _initialize_agents(self):
-        """Initialize CrewAI agents only if LLMs are available"""
+        """Initialize CrewAI agents only if Gemini LLM is available"""
         agents = {}
 
-        # Get the appropriate LLM for each agent
+        # Get Gemini LLM (Exclusive Neural Source)
         def get_llm():
             try:
-                print(f"Checking LLM availability...")
-                if self.claude:
-                    # Check if Claude has a valid API key
-                    claude_api_key = getattr(self.claude, 'api_key', None)
-                    print(f"Claude API key present: {bool(claude_api_key and claude_api_key.strip())}")
-                    if claude_api_key and claude_api_key.strip():
-                        # Claude for complex reasoning
-                        from langchain_anthropic import ChatAnthropic
-                        return ChatAnthropic(model="claude-3-5-sonnet-20241022", anthropic_api_key=claude_api_key)
-                    else:
-                        print("Claude API key is empty")
-                elif self.gemini_llm:
+                print(f"Checking Gemini LLM availability...")
+                if self.gemini_llm:
                     # Check if gemini_llm has a valid API key
                     api_key = getattr(self.gemini_llm, 'google_api_key', None)
                     print(f"Gemini API key present: {bool(api_key and api_key.strip())}")
                     if api_key and api_key.strip():  # Check if API key is not empty
-                        # Gemini for general tasks - pass API key correctly
+                        # Gemini for all tasks (Exclusive Neural Source)
                         from langchain_google_genai import ChatGoogleGenerativeAI
                         return ChatGoogleGenerativeAI(model="gemini-2.0-flash-exp", google_api_key=api_key)
                     else:
                         print("Gemini API key is empty")
                 else:
-                    print("No LLM clients available")
+                    print("Gemini LLM not available")
                     # No LLM available
                     return None
             except Exception as e:
-                print(f"Warning: Could not initialize LLM for agents: {e}")
+                print(f"Warning: Could not initialize Gemini LLM for agents: {e}")
                 return None
 
         llm = get_llm()
 
-        # Only create CrewAI agents if LLM is available
+        # Only create CrewAI agents if Gemini LLM is available
         if llm is None:
-            print("Warning: No API keys available for CrewAI agents. Using LangGraph-only mode.")
+            print("Warning: Gemini API key not available for CrewAI agents. Using LangGraph-only mode.")
             self.use_crewai = False
             return {}  # Empty agents dict
         else:
-            # Create agents with LLM
+            # Create agents with Gemini LLM
             self.use_crewai = True
-            print("Creating CrewAI agents with LLM...")
+            print("Creating CrewAI agents with Gemini LLM...")
             agents['manager'] = Agent(
                 role='Project Manager',
                 goal='Coordinate and manage tasks across the team',
@@ -202,41 +153,9 @@ class SwarmManager:
         return agents
 
     def _route_model_for_task(self, task: str, task_type: str = None) -> str:
-        """Route task to appropriate AI model based on Claude-Swarm Executive logic"""
-        task_lower = task.lower()
-
-        # Vision and voice tasks -> Gemini 2.5 Flash (high-speed)
-        if any(keyword in task_lower for keyword in [
-            'vision', 'see', 'look', 'image', 'photo', 'camera', 'visual',
-            'voice', 'speak', 'listen', 'audio', 'sound', 'hear'
-        ]) or task_type in ['vision', 'voice']:
-            if self.gemini_llm:
-                return 'gemini'
-            elif self.claude:
-                return 'claude'
-            else:
-                return 'ollama'
-
-        # Deep reasoning, coding, architectural tasks -> Claude 3.5 Sonnet
-        if any(keyword in task_lower for keyword in [
-            'code', 'program', 'script', 'algorithm', 'architecture', 'design',
-            'logic', 'reason', 'analyze', 'complex', 'deep', 'architectural',
-            'system', 'framework', 'planning', 'strategy', 'simulation'
-        ]) or task_type in ['coding', 'architecture', 'logic']:
-            if self.claude:
-                return 'claude'
-            elif self.gemini_llm:
-                return 'gemini'
-            else:
-                return 'ollama'
-
-        # Default routing based on availability
-        if self.gemini_llm:
-            return 'gemini'
-        elif self.claude:
-            return 'claude'
-        else:
-            return 'ollama'
+        """Route all tasks to Gemini 2.0 Flash (Exclusive Neural Source)"""
+        # All cognitive tasks are routed to Gemini per EXCLUSIVE SOURCE LOCKDOWN
+        return 'gemini'
 
     def _build_graph(self):
         """Build the LangGraph workflow"""
@@ -274,10 +193,69 @@ class SwarmManager:
 
         return workflow.compile()
 
+    def _init_desktop_controller(self) -> Optional[Dict[str, Any]]:
+        """Initialize desktop controller for OS mastery using pyautogui and pyobjc"""
+        try:
+            import pyautogui
+            pyautogui.FAILSAFE = True  # Enable failsafe
+            pyautogui.PAUSE = 0.1      # Small pause between actions
+            
+            # Try to import pyobjc for macOS application control
+            try:
+                from AppKit import NSWorkspace
+                from Quartz import CGWindowListCopyWindowInfo, kCGWindowListOptionOnScreenOnly
+                macos_available = True
+            except ImportError:
+                macos_available = False
+            
+            controller = {
+                'pyautogui': pyautogui,
+                'macos_available': macos_available,
+                'initialized': True
+            }
+            
+            print("✓ Desktop controller initialized for OS mastery")
+            return controller
+            
+        except Exception as e:
+            print(f"✗ Desktop controller initialization failed: {e}")
+            return None
+
+    def _detect_ambiguity(self, task: str) -> bool:
+        """Detect ambiguous or vague commands that need clarification"""
+        task_lower = task.lower()
+        
+        # Vague references that need clarification
+        vague_indicators = [
+            "that file", "this file", "those files", "these files",
+            "that window", "this window", "those windows", "these windows",
+            "that app", "this app", "those apps", "these apps",
+            "it", "them", "that one", "this one", "those ones",
+            "the file", "the window", "the app"  # Without specific identifiers
+        ]
+        
+        # Check for vague indicators
+        for indicator in vague_indicators:
+            if indicator in task_lower:
+                return True
+        
+        # Check for commands without specific targets
+        if any(word in task_lower for word in ["open", "close", "delete", "move", "copy"]) and not any(word in task_lower for word in [".txt", ".py", ".md", ".pdf", "desktop", "downloads", "documents"]):
+            return True
+        
+        return False
+
     def _manager_node(self, state: SwarmState) -> SwarmState:
         """Manager agent node - coordinates and routes tasks"""
         task = state["task"]
         messages = state["messages"]
+
+        # Ambiguity Trigger Protocol - Identify vague commands
+        if self._detect_ambiguity(task):
+            state["clarification_needed"] = True
+            state["response"] = "Ambiguity Trigger: Vague command detected. Please clarify which file, window, or item you are referring to."
+            state["options"] = ["List recent files", "Show open windows", "Specify file path", "Show desktop icons"]
+            return state
 
         # Check for direct protocol commands
         task_lower = task.lower()
@@ -385,7 +363,7 @@ For now, I can provide basic guidance: Japan is an amazing destination! Consider
             state["current_agent"] = "manager"
             state["confidence"] = 50
             state["clarification_needed"] = False
-            state["response"] = "I can help you with this task! However, I need API keys to provide intelligent AI assistance. Please add API keys (gemini, claude, or openai) to config.yaml and restart J.A.S.O.N. for full capabilities."
+            state["response"] = "I can help you with this task! However, I need a Gemini API key to provide intelligent AI assistance. Please add your Gemini API key to config.yaml and restart J.A.S.O.N. for full capabilities."
 
             return state
 
@@ -470,7 +448,7 @@ Supported providers: NordVPN, Mullvad, ExpressVPN (auto-detected)"""
             state["response"] = response.content
         except Exception as e:
             # Fallback to zero-API research when LLM not available
-            state["response"] = "I can help you research this topic! However, I need API keys to provide intelligent AI assistance. For now, I can perform basic web searches. Please add API keys (gemini, claude, or openai) to config.yaml and restart J.A.S.O.N. for full research capabilities."
+            state["response"] = "I can help you research this topic! However, I need a Gemini API key to provide intelligent AI assistance. For now, I can perform basic web searches. Please add your Gemini API key to config.yaml and restart J.A.S.O.N. for full research capabilities."
 
         return state
 
@@ -486,8 +464,12 @@ Supported providers: NordVPN, Mullvad, ExpressVPN (auto-detected)"""
         Write, debug, and optimize code as needed.
         """
 
-        response = self.llm.invoke([HumanMessage(content=prompt)])
-        state["response"] = response.content
+        try:
+            response = self.llm.invoke([HumanMessage(content=prompt)])
+            state["response"] = response.content
+        except Exception as e:
+            # Fallback when LLM not available
+            state["response"] = "I can help you with coding tasks! However, I need a Gemini API key to provide intelligent code generation and debugging assistance. Please add your Gemini API key to config.yaml and restart J.A.S.O.N. for full coding capabilities."
         return state
 
     def _security_node(self, state: SwarmState) -> SwarmState:

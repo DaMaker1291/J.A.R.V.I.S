@@ -5,25 +5,12 @@ Biometric Voice-Lock: Voiceprint Authentication System
 
 import pyttsx3
 try:
-    from elevenlabs import ElevenLabs
-    elevenlabs_available = True
-except ImportError:
-    elevenlabs_available = False
-try:
     import speech_recognition as sr
     speech_recognition_available = True
 except ImportError:
     speech_recognition_available = False
 
-# Add Kokoro TTS support
-kokoro_available = False
-try:
-    from kokoro import generate
-    kokoro_available = True
-except ImportError:
-    kokoro_available = False
-
-# Add Piper TTS support
+# Add Piper TTS support (Authorized: Zero-cost local synthesis)
 piper_available = False
 try:
     import subprocess
@@ -61,16 +48,15 @@ import threading
 import time
 
 class AudioManager:
-    def __init__(self, elevenlabs_api_key: Optional[str] = None):
+    def __init__(self):
         # Initialize TTS engines
         self.pyttsx_engine = pyttsx3.init()
 
-        # ElevenLabs TTS
-        self.elevenlabs_client = None
-        if elevenlabs_available and elevenlabs_api_key:
-            self.elevenlabs_client = ElevenLabs(api_key=elevenlabs_api_key)
+        # Piper TTS (Authorized: Zero-cost local synthesis)
+        self.piper_available = piper_available
+        self.piper_model_path = "/usr/share/piper/en_US-lessac-medium.onnx"  # Default Piper model path
 
-        # Speech recognition
+        # Speech recognition (Authorized: Gemini API integration planned)
         self.recognizer = None
         if speech_recognition_available:
             self.recognizer = sr.Recognizer()
@@ -458,115 +444,20 @@ class AudioManager:
         except Exception as e:
             return f"Listening error: {e}"
 
-    def speak(self, text: str, use_elevenlabs: bool = False, use_piper: bool = True) -> str:
-        """Convert text to speech with military persona - prioritizes Piper for zero-API"""
+    def speak(self, text: str) -> str:
+        """Convert text to speech using Piper TTS (zero-cost local synthesis)"""
         try:
-            # Apply military persona formatting
-            if self.military_persona:
-                text = self._apply_military_persona(text)
-
-            # Priority: Piper (zero-API) > Kokoro > ElevenLabs (API) > pyttsx3 (fallback)
-            if use_piper and self.piper_available:
+            # Priority: Piper (zero-API) > pyttsx3 (fallback)
+            if self.piper_available:
                 return self._piper_speak(text)
-            elif self.kokoro_available:
-                return self._kokoro_speak(text)
-            elif use_elevenlabs and self.elevenlabs_available:
-                # Use ElevenLabs only if explicitly requested and API available
-                audio = self.elevenlabs_client.generate(text=text, voice="Adam")
-                return f"Tactical briefing delivered via ElevenLabs: {text[:50]}..."
             else:
-                # Use pyttsx3 as final fallback
+                # Use pyttsx3 as fallback
                 self.pyttsx_engine.say(text)
                 self.pyttsx_engine.runAndWait()
                 return f"Tactical update: {text[:50]}..."
 
         except Exception as e:
             return f"Voice synthesis failed: {e}"
-
-    def _apply_military_persona(self, text: str) -> str:
-        """Apply military brevity and tactical language to responses"""
-        # Replace common phrases with military equivalents
-        replacements = {
-            "I will": "Executing:",
-            "I am": "Status:",
-            "Please": "",
-            "Thank you": "Confirmed",
-            "You are": "Lead, you are",
-            "Hello": "Reporting",
-            "Goodbye": "Mission complete",
-            "Yes": "Affirmative",
-            "No": "Negative",
-            "Okay": "Roger",
-            "Understood": "Copy that",
-            "Help": "Requesting assistance",
-            "Problem": "Situation report",
-            "Error": "Malfunction",
-            "Success": "Objective achieved",
-            "Working on it": "Engaged",
-            "Almost done": "Nearing completion",
-            "Finished": "Task complete"
-        }
-
-        formatted_text = text
-        for civilian, military in replacements.items():
-            formatted_text = formatted_text.replace(civilian, military)
-
-        # Add tactical prefixes/suffixes
-        if not formatted_text.startswith(("Status:", "Executing:", "Confirmed", "Affirmative", "Negative", "Roger")):
-            formatted_text = "Tactical update: " + formatted_text
-
-        return formatted_text
-
-    def _piper_speak(self, text: str) -> str:
-        """Use Piper TTS for local speech synthesis"""
-        try:
-            # Piper typically uses command line
-            if os.path.exists(self.piper_model_path):
-                # Create temporary text file
-                with open('/tmp/piper_text.txt', 'w') as f:
-                    f.write(text)
-
-                # Run Piper
-                result = subprocess.run([
-                    'piper', '--model', self.piper_model_path, '--output_file', '/tmp/piper_output.wav'
-                ], input=text, text=True, capture_output=True)
-
-                if result.returncode == 0:
-                    # In real implementation, play the wav file
-                    return f"Tactical briefing delivered via Piper: {text[:50]}..."
-                else:
-                    return f"Piper TTS failed: {result.stderr}"
-
-            else:
-                return "Piper model not found"
-
-        except Exception as e:
-            return f"Piper TTS error: {e}"
-
-    def _kokoro_speak(self, text: str) -> str:
-        """Use Kokoro TTS for local speech synthesis"""
-        try:
-            if self.kokoro_available:
-                # Generate audio with Kokoro
-                audio = generate(text, voice='en-us', speed=1.0)
-
-                # Assume audio is numpy array at 24kHz
-                from scipy.io.wavfile import write
-                write('/tmp/kokoro_output.wav', 24000, audio)
-
-                # Play with vlc
-                result = subprocess.run([
-                    'vlc', '--intf', 'dummy', '--play-and-exit', '/tmp/kokoro_output.wav'
-                ], capture_output=True, timeout=30)
-
-                if result.returncode == 0:
-                    return f"Tactical briefing delivered via Kokoro: {text[:50]}..."
-                else:
-                    return f"Kokoro playback failed: {result.stderr}"
-            else:
-                return "Kokoro not available"
-        except Exception as e:
-            return f"Kokoro TTS error: {e}"
 
     def set_voice_properties(self, rate: int = 200, volume: float = 1.0):
         """Configure voice properties"""

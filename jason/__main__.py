@@ -340,10 +340,13 @@ def init_config(path):
     create_config_template()
 
 @cli.command()
-@click.option('--country', default=None, help='VPN country code (e.g., us, uk, de)')
-@click.option('--disconnect', is_flag=True, help='Disconnect VPN')
-@click.option('--drift', is_flag=True, help='Start/stop privacy drift')
-def vpn(country, disconnect, drift):
+@click.option('--host', default='127.0.0.1', help='Host to bind the API server to')
+@click.option('--port', default=8000, type=int, help='Port to bind the API server to')
+def api(host, port):
+    """Start the FastAPI API server."""
+    from jason.core.api_server import start_api_server
+    click.echo(f"Starting J.A.S.O.N. API server on {host}:{port}")
+    start_api_server(host=host, port=port)
     """Control VPN connections and privacy drift"""
     from jason.modules.cyber_stealth import CyberStealthManager
 
