@@ -25,6 +25,7 @@ export function DemoPageDark() {
     }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [backendAvailable, setBackendAvailable] = useState(true); // Assume available initially
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const exampleCommands = [
@@ -120,6 +121,21 @@ Cleanup complete! Freed 1.08 GB of space.`,
     },
   };
 
+  useEffect(() => {
+    // Check backend availability on component mount
+    const checkBackend = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:8000/status', {
+          timeout: 5000
+        });
+        setBackendAvailable(response.ok);
+      } catch (error) {
+        setBackendAvailable(false);
+      }
+    };
+    checkBackend();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isProcessing) return;
@@ -136,6 +152,43 @@ Cleanup complete! Freed 1.08 GB of space.`,
 
     setInput("");
 
+    // If backend is not available, use demo mode
+    if (!backendAvailable) {
+      setTimeout(() => {
+        let response = commandResponses[command];
+        
+        if (!response) {
+          if (command.toLowerCase().startsWith("app launch")) {
+            const appName = command.substring(11).trim();
+            response = {
+              output: `✓ Launching ${appName}...\n✓ Application started successfully\nProcess ID: ${Math.floor(Math.random() * 10000)}`,
+              type: "success"
+            };
+          } else {
+            response = {
+              output: `Command not recognized: "${command}"\nType 'help' to see available commands.\n\nNote: Running in demo mode. For full functionality, run the app locally.`,
+              type: "error"
+            };
+          }
+        }
+
+        setHistory(prev => {
+          const newHistory = [...prev];
+          newHistory[newHistory.length - 1] = {
+            command,
+            output: response.output,
+            timestamp: new Date().toLocaleTimeString(),
+            type: response.type
+          };
+          return newHistory;
+        });
+
+        setIsProcessing(false);
+      }, 800);
+      return;
+    }
+
+    // Backend is available, use real API
     try {
       const response = await fetch('http://127.0.0.1:8000/execute', {
         method: 'POST',
@@ -195,12 +248,12 @@ Cleanup complete! Freed 1.08 GB of space.`,
           <h1 className="text-3xl font-semibold tracking-tight text-white mb-1">Interactive Demo</h1>
           <p className="text-sm text-zinc-400">Execute automation commands in real-time</p>
         </div>
-        <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-3 py-1">
+        <Badge className={`px-3 py-1 ${backendAvailable ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
           <span className="relative flex h-2 w-2 mr-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${backendAvailable ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${backendAvailable ? 'bg-emerald-500' : 'bg-amber-500'}`} />
           </span>
-          Live Demo
+          {backendAvailable ? 'Live Demo' : 'Demo Mode'}
         </Badge>
       </div>
 
