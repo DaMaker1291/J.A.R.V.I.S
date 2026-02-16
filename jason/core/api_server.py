@@ -59,8 +59,10 @@ async def execute_command(request: CommandRequest):
     try:
         global swarm_manager
         if swarm_manager is None:
+            # Initialize with Gemini API key for real AI functionality
+            gemini_api_key = "AIzaSyClGKxYkFkDcZnK4kpnKRImphZhd0BrGn8"
             from jason.core.swarm import SwarmManager
-            swarm_manager = SwarmManager()
+            swarm_manager = SwarmManager(gemini_api_key=gemini_api_key)
 
         # Execute task through LangGraph
         print(f"Executing command: {request.command}")
@@ -80,8 +82,10 @@ async def clarify_command(request: ClarificationRequest):
     try:
         global swarm_manager
         if swarm_manager is None:
+            # Initialize with Gemini API key for real AI functionality
+            gemini_api_key = "AIzaSyClGKxYkFkDcZnK4kpnKRImphZhd0BrGn8"
             from jason.core.swarm import SwarmManager
-            swarm_manager = SwarmManager()
+            swarm_manager = SwarmManager(gemini_api_key=gemini_api_key)
 
         # Update task with clarification
         # This would need to be integrated with the LangGraph state management
