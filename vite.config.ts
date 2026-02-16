@@ -11,7 +11,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  base: '/',
+  base: '/J.A.R.V.I.S/',
   resolve: {
     alias: {
       "@": fileURLToPath(new URL('./src', import.meta.url)),
