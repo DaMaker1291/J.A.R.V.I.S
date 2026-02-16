@@ -3668,35 +3668,42 @@ END:VCALENDAR"""
         return {'actions': actions, 'operations': operations}
 
     def _plan_move_for_file(self, file_path: Path, org_dirs: Dict[str, Path], file_types: Dict[str, List[str]]) -> Optional[Dict[str, Any]]:
-        """Compute a safe move operation (dry-run) for a file, if applicable."""
+        """Compute a safe move operation (dry-run) for a file, if applicable.
+
+        IMPORTANT: This must not mutate the filesystem.
+        """
         try:
             file_ext = file_path.suffix.lower()
-            
+
             # Determine category
             target_category = 'other'
             for category, extensions in file_types.items():
                 if file_ext in extensions:
                     target_category = category
                     break
-            
+
             # Create target path
             target_dir = org_dirs[target_category]
             target_path = target_dir / file_path.name
-            
+
             # Handle duplicate names
             counter = 1
             while target_path.exists():
                 stem = file_path.stem
                 target_path = target_dir / f"{stem}_{counter}{file_ext}"
                 counter += 1
-            
-            # Move the file
-            file_path.rename(target_path)
-            return True
-            
-        except Exception as e:
-            print(f"Error organizing {file_path}: {e}")
-            return False
+
+            # No-op if already in destination
+            try:
+                if file_path.resolve().parent == target_dir.resolve():
+                    return None
+            except Exception:
+                pass
+
+            return {'op': 'move', 'src': str(file_path), 'dst': str(target_path)}
+
+        except Exception:
+            return None
     
     def _maintenance_workflow(self, task: str) -> Dict[str, Any]:
         """Deterministic system maintenance workflow"""
