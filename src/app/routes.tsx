@@ -5,7 +5,7 @@ import { DemoPageDark } from "./components/DemoPageDark";
 import { MonitoringPageDark } from "./components/MonitoringPageDark";
 
 // Handle GitHub Pages basename
-const basename = import.meta.env.DEV ? '' : '/J.A.R.V.I.S';
+const basename = '/J.A.R.V.I.S';
 
 export const router = createBrowserRouter([
   {

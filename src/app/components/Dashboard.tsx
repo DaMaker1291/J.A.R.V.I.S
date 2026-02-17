@@ -33,10 +33,10 @@ export function Dashboard() {
   ]);
 
   const [metrics, setMetrics] = useState({
-    cpu: 24.3,
-    memory: 68.5,
-    activeProcesses: 247,
-    automations: 12,
+    cpu: 0,
+    memory: 0,
+    activeProcesses: 0,
+    automations: 0,
   });
 
   const [backendStatus, setBackendStatus] = useState('checking');
@@ -44,6 +44,7 @@ export function Dashboard() {
   // Check backend status on mount
   useEffect(() => {
     checkBackendStatus();
+    fetchRealMetrics();
   }, []);
 
   const checkBackendStatus = async () => {
@@ -88,26 +89,64 @@ export function Dashboard() {
     }
   };
 
-  // Simulate real-time updates
+  // Fetch real metrics periodically
   useEffect(() => {
     const interval = setInterval(() => {
-      setCpuData((prev) => {
-        const newData = [...prev.slice(1)];
-        newData.push({
-          value: Math.max(10, Math.min(90, prev[prev.length - 1].value + (Math.random() - 0.5) * 8)),
-        });
-        return newData;
-      });
-
-      setMetrics((prev) => ({
-        ...prev,
-        cpu: Math.max(10, Math.min(90, prev.cpu + (Math.random() - 0.5) * 4)),
-        memory: Math.max(50, Math.min(85, prev.memory + (Math.random() - 0.5) * 2)),
-      }));
-    }, 2000);
+      fetchRealMetrics();
+    }, 5000); // Update every 5 seconds
 
     return () => clearInterval(interval);
   }, []);
+
+  const fetchRealMetrics = async () => {
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+    if (!apiBase) return;
+    
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, '')}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          command: 'monitor cpu',
+        }),
+      });
+      const result = await response.json();
+      if (result && result.result) {
+        // Parse the CPU monitoring result
+        const lines = result.result.split('\n');
+        let cpuUsage = 0;
+        let processes = 0;
+        
+        for (const line of lines) {
+          if (line.startsWith('Usage:')) {
+            const match = line.match(/Usage:\s*([\d.]+)/);
+            if (match) cpuUsage = parseFloat(match[1]);
+          }
+          if (line.startsWith('Processes:')) {
+            const match = line.match(/Processes:\s*(\d+)/);
+            if (match) processes = parseInt(match[1]);
+          }
+        }
+        
+        // Update CPU data for chart
+        setCpuData(prev => {
+          const newData = [...prev.slice(1)];
+          newData.push({ value: cpuUsage });
+          return newData;
+        });
+        
+        setMetrics(prev => ({
+          ...prev,
+          cpu: cpuUsage,
+          activeProcesses: processes,
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch real metrics:', error);
+    }
+  };
 
   const recentAutomations = [
     {
@@ -231,12 +270,6 @@ export function Dashboard() {
             <StatusIndicator status="optimal" />
             <span className="ml-2">All Systems Operational</span>
           </Badge>
-          <Link to="/demo">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Play className="mr-2 size-4" strokeWidth={2} />
-              Try Demo
-            </Button>
-          </Link>
         </div>
       </div>
 

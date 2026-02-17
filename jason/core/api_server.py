@@ -24,6 +24,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "http://127.0.0.1:60056",  # Browser preview proxy
     ],
     allow_origin_regex=r"https://.*\\.github\\.io$",
     allow_credentials=False,
@@ -146,6 +147,11 @@ async def highlight_areas(areas: Dict[str, Any]):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Overlay failed: {str(e)}")
+
+@app.get("/")
+async def root():
+    """Root endpoint returning API status"""
+    return await get_status()
 
 @app.get("/status")
 async def get_status():
