@@ -10,6 +10,7 @@ piper-tts>=1.2.0
 # AI & NLP (Authorized: Exclusive Gemini 2.5 Flash)
 google-generativeai>=0.3.0
 langchain-google-genai
+langgraph>=0.0.40
 
 # Web & API (Authorized: Google API Client, CalDAV)
 requests>=2.26.0

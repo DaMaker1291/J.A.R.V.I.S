@@ -56,7 +56,8 @@ def load_config():
                 'google_calendar': '', # For Google Calendar integration
                 'outlook': '',     # For Outlook calendar integration
                 'zapier': '',      # For automation workflows
-                'make': ''         # For advanced automation
+                'make': '',         # For advanced automation
+                'captcha': ''       # For CAPTCHA solving services
             },
             # Zero-API configuration (default mode)
             'zero_api_mode': True,  # Enable deterministic processing without APIs

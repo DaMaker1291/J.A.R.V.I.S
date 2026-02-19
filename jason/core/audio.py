@@ -33,7 +33,7 @@ except ImportError:
 speechbrain_available = False
 try:
     import speechbrain
-    from speechbrain.pretrained import SpeakerRecognition
+    from speechbrain.inference import SpeakerRecognition
     speechbrain_available = True
 except ImportError:
     pass
@@ -48,7 +48,8 @@ import threading
 import time
 
 class AudioManager:
-    def __init__(self):
+    def __init__(self, elevenlabs_api_key: str = ""):
+        self.elevenlabs_api_key = elevenlabs_api_key
         # Initialize TTS engines
         self.pyttsx_engine = pyttsx3.init()
 

@@ -12,6 +12,8 @@ import threading
 import os
 from pathlib import Path
 
+import anyio
+
 import yaml
 
 app = FastAPI(title="J.A.S.O.N. API", description="Local execution API for J.A.S.O.N.")
@@ -22,8 +24,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:5174",
+        "http://localhost:5175",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
         "http://127.0.0.1:60056",  # Browser preview proxy
     ],
     allow_origin_regex=r"https://.*\\.github\\.io$",
@@ -61,9 +65,12 @@ def _get_gemini_api_key(config: Dict[str, Any]) -> str:
     env_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if env_key and env_key.strip():
         return env_key.strip()
-    cfg_key = (config.get("api_keys") or {}).get("gemini")
-    if isinstance(cfg_key, str) and cfg_key.strip():
-        return cfg_key.strip()
+    
+    api_keys = config.get("api_keys")
+    if isinstance(api_keys, dict):
+        cfg_key = api_keys.get("gemini")
+        if isinstance(cfg_key, str) and cfg_key.strip():
+            return cfg_key.strip()
     return ""
 
 @app.on_event("startup")
@@ -95,15 +102,15 @@ async def execute_command(request: CommandRequest):
             swarm_manager = SwarmManager(gemini_api_key=gemini_api_key, config=config)
 
         # Execute task through LangGraph
-        print(f"Executing command: {request.command}")
-        result = swarm_manager.process_command(request.command)
-        print(f"Execution result: {result}")
-
-        return {"result": result, "status": "success"}
+        result = await anyio.to_thread.run_sync(swarm_manager.process_command, request.command)
+        return {"result": result}
 
     except Exception as e:
         import traceback
-        print(f"Error in execute_command: {traceback.format_exc()}")
+        error_detail = traceback.format_exc()
+        print(f"ERROR in execute_command: {error_detail}")
+        with open("/tmp/error_traceback.log", "w") as f:
+            f.write(error_detail)
         raise HTTPException(status_code=500, detail=f"Execution failed: {str(e)}")
 
 @app.post("/clarify")

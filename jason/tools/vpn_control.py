@@ -8,6 +8,7 @@ import logging
 import time
 from typing import Optional, List
 from pathlib import Path
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,9 @@ class VPNController:
         self.vpn_provider = vpn_provider
         self.connected_country: Optional[str] = None
 
+    def is_available(self) -> bool:
+        return shutil.which(self.vpn_provider) is not None
+
     def connect(self, country: str) -> bool:
         """Connect to VPN in specified country
 
@@ -32,6 +36,9 @@ class VPNController:
         Returns:
             bool: True if successful
         """
+        if not self.is_available():
+            logger.warning(f"VPN provider CLI not found: {self.vpn_provider}")
+            return False
         try:
             cmd = [self.vpn_provider, "connect", country]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -57,6 +64,9 @@ class VPNController:
         Returns:
             bool: True if successful
         """
+        if not self.is_available():
+            self.connected_country = None
+            return False
         try:
             cmd = [self.vpn_provider, "disconnect"]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
@@ -79,6 +89,8 @@ class VPNController:
         Returns:
             dict: Status information
         """
+        if not self.is_available():
+            return {"connected": False, "country": None, "error": f"VPN provider CLI not found: {self.vpn_provider}"}
         try:
             cmd = [self.vpn_provider, "status"]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)

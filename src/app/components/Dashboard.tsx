@@ -65,11 +65,11 @@ export function Dashboard() {
     }
   };
 
+  const [commandResult, setCommandResult] = useState<string | null>(null);
+  const [customCommand, setCustomCommand] = useState<string>("");
+
   const executeCommand = async (command: string) => {
-    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
-    if (!apiBase) {
-      return { error: 'Backend is not configured' };
-    }
+    const apiBase = 'http://localhost:8000';
     try {
       const response = await fetch(`${apiBase.replace(/\/$/, '')}/execute`, {
         method: 'POST',
@@ -82,6 +82,9 @@ export function Dashboard() {
         }),
       });
       const result = await response.json();
+      if (result && result.result) {
+        setCommandResult(result.result);
+      }
       return result;
     } catch (error) {
       console.error('Failed to execute command:', error);
@@ -99,8 +102,7 @@ export function Dashboard() {
   }, []);
 
   const fetchRealMetrics = async () => {
-    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
-    if (!apiBase) return;
+    const apiBase = 'http://localhost:8000';
     
     try {
       const response = await fetch(`${apiBase.replace(/\/$/, '')}/execute`, {
@@ -117,16 +119,20 @@ export function Dashboard() {
         // Parse the CPU monitoring result
         const lines = result.result.split('\n');
         let cpuUsage = 0;
-        let processes = 0;
+        let memoryUsage = 0;
+        let activeProcesses = 0;
         
         for (const line of lines) {
           if (line.startsWith('Usage:')) {
             const match = line.match(/Usage:\s*([\d.]+)/);
             if (match) cpuUsage = parseFloat(match[1]);
           }
-          if (line.startsWith('Processes:')) {
+          if (line.includes('Memory:')) {
+            // Parse memory if available
+          }
+          if (line.includes('Processes:')) {
             const match = line.match(/Processes:\s*(\d+)/);
-            if (match) processes = parseInt(match[1]);
+            if (match) activeProcesses = parseInt(match[1]);
           }
         }
         
@@ -140,7 +146,8 @@ export function Dashboard() {
         setMetrics(prev => ({
           ...prev,
           cpu: cpuUsage,
-          activeProcesses: processes,
+          memory: memoryUsage,
+          activeProcesses: activeProcesses,
         }));
       }
     } catch (error) {
@@ -257,8 +264,7 @@ export function Dashboard() {
     );
   };
 
-  return (
-    <div className="p-8 lg:pt-8 pt-20 space-y-8">
+  return <div className="p-8 lg:pt-8 pt-20 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -270,6 +276,36 @@ export function Dashboard() {
             <StatusIndicator status="optimal" />
             <span className="ml-2">All Systems Operational</span>
           </Badge>
+        </div>
+      </div>
+
+      {/* Custom Command Input */}
+      <div className="bg-white/5 border-white/5 p-6 backdrop-blur-sm rounded-lg">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Execute Command</h3>
+            <p className="text-sm text-zinc-400">Enter any natural language command for real automation</p>
+          </div>
+        </div>
+        <div className="flex gap-4">
+          <input
+            type="text"
+            value={customCommand}
+            onChange={(e) => setCustomCommand(e.target.value)}
+            placeholder="e.g., boost productivity, arrange windows, file my taxes..."
+            className="flex-1 px-4 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <Button
+            onClick={async () => {
+              if (customCommand.trim()) {
+                await executeCommand(customCommand.trim());
+                setCustomCommand("");
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Execute
+          </Button>
         </div>
       </div>
 
@@ -510,6 +546,31 @@ export function Dashboard() {
           </div>
         </Card>
       </motion.div>
+
+      {/* Command Result */}
+      {commandResult && <Card className="bg-white/5 border-white/5 p-6 backdrop-blur-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-lg bg-green-600/20 flex items-center justify-center">
+              <CheckCircle2 className="size-5 text-green-400" strokeWidth={2} />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Command Result</h3>
+              <p className="text-sm text-zinc-400">Real automation execution result</p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCommandResult(null)}
+            className="text-zinc-400 hover:text-white"
+          >
+            Clear
+          </Button>
+        </div>
+        <div className="bg-black/20 rounded-lg p-4 font-mono text-sm text-zinc-300 whitespace-pre-wrap">
+          {commandResult}
+        </div>
+      </Card>}
     </div>
-  );
 }

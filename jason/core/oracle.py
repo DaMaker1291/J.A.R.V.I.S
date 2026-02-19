@@ -127,47 +127,27 @@ class OracleManager:
         return result
 
     def _classify_scenario(self, scenario: str) -> str:
-        """Classify scenario type based on keywords"""
+        """Classify scenario type based on keywords with typo resilience"""
         scenario_lower = scenario.lower()
 
-        # Financial scenarios
-        if any(word in scenario_lower for word in ['stock', 'invest', 'buy', 'sell', 'market', 'financial', 'money']):
-            return 'financial'
+        # Fuzzy keyword matching for typo resilience
+        keywords = {
+            'financial': ['stock', 'invest', 'buy', 'sell', 'market', 'financial', 'money', 'fianncial', 'monney', 'invst'],
+            'meeting': ['meeting', 'presentation', 'interview', 'discussion', 'meetiing', 'interviiew', 'discusssion'],
+            'investment': ['portfolio', 'diversify', 'allocation', 'returns', 'portfollo', 'diversiffy'],
+            'career': ['job', 'career', 'promotion', 'switch', 'quit', 'carreer', 'promootion'],
+            'relationship': ['relationship', 'marriage', 'breakup', 'date', 'relattonship', 'marrriage'],
+            'health': ['health', 'medical', 'treatment', 'exercise', 'heallth', 'meddical'],
+            'travel': ['travel', 'trip', 'vacation', 'flight', 'travvel', 'fligght', 'vacaation'],
+            'purchase': ['buy', 'purchase', 'acquire', 'price', 'purchas'],
+            'negotiation': ['negotiate', 'deal', 'contract', 'agreement', 'negotiiate', 'conttract']
+        }
 
-        # Meeting scenarios
-        elif any(word in scenario_lower for word in ['meeting', 'presentation', 'interview', 'discussion']):
-            return 'meeting'
+        for category, category_keywords in keywords.items():
+            if any(word in scenario_lower for word in category_keywords):
+                return category
 
-        # Investment scenarios
-        elif any(word in scenario_lower for word in ['portfolio', 'diversify', 'allocation', 'returns']):
-            return 'investment'
-
-        # Career scenarios
-        elif any(word in scenario_lower for word in ['job', 'career', 'promotion', 'switch', 'quit']):
-            return 'career'
-
-        # Relationship scenarios
-        elif any(word in scenario_lower for word in ['relationship', 'marriage', 'breakup', 'date']):
-            return 'relationship'
-
-        # Health scenarios
-        elif any(word in scenario_lower for word in ['health', 'medical', 'treatment', 'exercise']):
-            return 'health'
-
-        # Travel scenarios
-        elif any(word in scenario_lower for word in ['travel', 'trip', 'vacation', 'flight']):
-            return 'travel'
-
-        # Purchase scenarios
-        elif any(word in scenario_lower for word in ['buy', 'purchase', 'acquire', 'price']):
-            return 'purchase'
-
-        # Negotiation scenarios
-        elif any(word in scenario_lower for word in ['negotiate', 'deal', 'contract', 'agreement']):
-            return 'negotiation'
-
-        else:
-            return 'custom'
+        return 'custom'
 
     def _run_monte_carlo_simulation(self, model_func: Callable, parameters: Dict[str, Any],
                                   num_simulations: int, scenario: str) -> List[Dict[str, Any]]:
