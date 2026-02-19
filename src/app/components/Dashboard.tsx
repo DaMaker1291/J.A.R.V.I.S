@@ -14,6 +14,9 @@ import {
   Clock,
   Play,
   AlertCircle,
+  Camera,
+  MousePointer,
+  Keyboard,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -210,6 +213,27 @@ export function Dashboard() {
       label: "Run Command",
       description: "Execute custom automation",
       color: "orange",
+    },
+  ];
+
+  const computerActions = [
+    {
+      icon: Camera,
+      label: "Take Screenshot",
+      description: "Capture current screen",
+      command: "take screenshot"
+    },
+    {
+      icon: MousePointer,
+      label: "Move Mouse",
+      description: "Move cursor to center",
+      command: "move mouse to 500 500"
+    },
+    {
+      icon: Keyboard,
+      label: "Type Text",
+      description: "Type sample text",
+      command: "type hello world"
     },
   ];
 
@@ -496,6 +520,49 @@ export function Dashboard() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Computer Automation */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35, type: "spring", stiffness: 380, damping: 30 }}
+      >
+        <Card className="bg-white/5 border-white/5 p-6 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white">Computer Automation</h3>
+              <p className="text-sm text-zinc-400 mt-1">Direct computer control actions</p>
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            {computerActions.map((action, index) => {
+              const Icon = action.icon;
+              const handleClick = async () => {
+                const result = await executeCommand(action.command);
+                console.log('Command result:', result);
+              };
+              return (
+                <motion.button
+                  key={action.label}
+                  onClick={handleClick}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="group flex items-start gap-4 p-4 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-all text-left"
+                >
+                  <div className="size-10 rounded-lg bg-red-600/20 flex items-center justify-center flex-shrink-0 group-hover:bg-red-600/30 transition-colors">
+                    <Icon className="size-5 text-red-400" strokeWidth={2} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-medium text-white mb-1">{action.label}</h4>
+                    <p className="text-xs text-zinc-400">{action.description}</p>
+                  </div>
+                  <ArrowRight className="size-4 text-zinc-500 group-hover:text-zinc-300 transition-colors flex-shrink-0 mt-1" />
+                </motion.button>
+              );
+            })}
+          </div>
+        </Card>
+      </motion.div>
 
       {/* Performance Insights */}
       <motion.div
