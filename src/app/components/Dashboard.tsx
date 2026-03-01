@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { motion } from "motion/react";
 import {
-  Terminal,
-  Cpu,
   Activity,
   Zap,
   Calendar,
@@ -14,9 +12,11 @@ import {
   Clock,
   Play,
   AlertCircle,
+  Monitor,
+  Mouse,
+  Keyboard,
   Camera,
   MousePointer,
-  Keyboard,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -25,6 +25,7 @@ import { Progress } from "./ui/progress";
 import { AreaChart, Area, ResponsiveContainer, LineChart, Line } from "recharts";
 
 export function Dashboard() {
+  const apiBase = ((import.meta as any).env?.VITE_API_BASE_URL as string | undefined) ?? "/J.A.R.V.I.S/api";
   const [cpuData, setCpuData] = useState([
     { value: 20 },
     { value: 25 },
@@ -51,11 +52,6 @@ export function Dashboard() {
   }, []);
 
   const checkBackendStatus = async () => {
-    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
-    if (!apiBase) {
-      setBackendStatus('disconnected');
-      return;
-    }
     try {
       const response = await fetch(`${apiBase.replace(/\/$/, '')}/status`);
       if (response.ok) {
@@ -72,7 +68,6 @@ export function Dashboard() {
   const [customCommand, setCustomCommand] = useState<string>("");
 
   const executeCommand = async (command: string) => {
-    const apiBase = 'http://localhost:8000';
     try {
       const response = await fetch(`${apiBase.replace(/\/$/, '')}/execute`, {
         method: 'POST',
@@ -85,13 +80,15 @@ export function Dashboard() {
         }),
       });
       const result = await response.json();
-      if (result && result.result) {
+      if (!response.ok) {
+        setCommandResult(result.detail || 'Execution failed');
+      } else if (result && result.result) {
         setCommandResult(result.result);
       }
       return result;
     } catch (error) {
-      console.error('Failed to execute command:', error);
-      return { error: 'Failed to connect to backend' };
+      console.log('Command result:', {error: 'Failed to connect to backend'});
+      setCommandResult('Failed to connect to backend');
     }
   };
 
@@ -105,56 +102,33 @@ export function Dashboard() {
   }, []);
 
   const fetchRealMetrics = async () => {
-    const apiBase = 'http://localhost:8000';
-    
     try {
-      const response = await fetch(`${apiBase.replace(/\/$/, '')}/execute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          command: 'monitor cpu',
-        }),
+      const response = await fetch(`${apiBase.replace(/\/$/, '')}/metrics`);
+      if (!response.ok) {
+        setBackendStatus('error');
+        return;
+      }      const result = await response.json();
+      const cpuUsage = typeof result?.cpu_percent === 'number' ? result.cpu_percent : 0;
+      const memoryUsage = typeof result?.memory_percent === 'number' ? result.memory_percent : 0;
+      const activeProcesses = typeof result?.processes === 'number' ? result.processes : 0;
+      const automations = typeof result?.automations === 'number' ? result.automations : 0;
+
+      setCpuData(prev => {
+        const newData = [...prev.slice(1)];
+        newData.push({ value: cpuUsage });
+        return newData;
       });
-      const result = await response.json();
-      if (result && result.result) {
-        // Parse the CPU monitoring result
-        const lines = result.result.split('\n');
-        let cpuUsage = 0;
-        let memoryUsage = 0;
-        let activeProcesses = 0;
-        
-        for (const line of lines) {
-          if (line.startsWith('Usage:')) {
-            const match = line.match(/Usage:\s*([\d.]+)/);
-            if (match) cpuUsage = parseFloat(match[1]);
-          }
-          if (line.includes('Memory:')) {
-            // Parse memory if available
-          }
-          if (line.includes('Processes:')) {
-            const match = line.match(/Processes:\s*(\d+)/);
-            if (match) activeProcesses = parseInt(match[1]);
-          }
-        }
-        
-        // Update CPU data for chart
-        setCpuData(prev => {
-          const newData = [...prev.slice(1)];
-          newData.push({ value: cpuUsage });
-          return newData;
-        });
-        
-        setMetrics(prev => ({
-          ...prev,
-          cpu: cpuUsage,
-          memory: memoryUsage,
-          activeProcesses: activeProcesses,
-        }));
-      }
+
+      setMetrics(prev => ({
+        ...prev,
+        cpu: cpuUsage,
+        memory: memoryUsage,
+        activeProcesses,
+        automations,
+      }));
+      setBackendStatus('connected');
     } catch (error) {
-      console.error('Failed to fetch real metrics:', error);
+      setBackendStatus('disconnected');
     }
   };
 
@@ -209,7 +183,7 @@ export function Dashboard() {
       color: "green",
     },
     {
-      icon: Terminal,
+      icon: Play,
       label: "Run Command",
       description: "Execute custom automation",
       color: "orange",
@@ -218,13 +192,13 @@ export function Dashboard() {
 
   const computerActions = [
     {
-      icon: Camera,
+      icon: Monitor,
       label: "Take Screenshot",
       description: "Capture current screen",
       command: "take screenshot"
     },
     {
-      icon: MousePointer,
+      icon: Mouse,
       label: "Move Mouse",
       description: "Move cursor to center",
       command: "move mouse to 500 500"
@@ -277,17 +251,9 @@ export function Dashboard() {
     };
 
     return (
-      <span className="relative flex h-2 w-2">
-        <span
-          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${colors[status as keyof typeof colors]}`}
-        />
-        <span
-          className={`relative inline-flex rounded-full h-2 w-2 ${colors[status as keyof typeof colors]}`}
-        />
-      </span>
+      <span className={`inline-block w-2 h-2 rounded-full ${colors[status as keyof typeof colors]}`} />
     );
   };
-
   return <div className="p-8 lg:pt-8 pt-20 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -326,9 +292,9 @@ export function Dashboard() {
                 setCustomCommand("");
               }
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            Execute
+            <Play className="w-4 h-4 mr-2 inline" />Execute
           </Button>
         </div>
       </div>
@@ -408,6 +374,11 @@ export function Dashboard() {
               </div>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
+              <button className="p-4 bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow text-left">
+                <Zap className="w-5 h-5 text-yellow-500 mb-2" />
+                <h4 className="font-semibold text-gray-900">Boost Productivity</h4>
+                <p className="text-sm text-gray-600">Close distractions, launch work apps</p>
+              </button>
               {quickActions.map((action, index) => {
                 const Icon = action.icon;
                 const handleClick = async () => {

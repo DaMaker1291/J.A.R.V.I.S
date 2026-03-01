@@ -18,6 +18,15 @@ export default defineConfig({
       "@": fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      '/J.A.R.V.I.S/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/J.A.R.V.I.S\/api/, '')
+      }
+    }
+  },
   build: {
     sourcemap: false,
     outDir: '../docs',

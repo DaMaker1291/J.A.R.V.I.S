@@ -207,49 +207,50 @@ Total: 247 processes`,
 
     setInput("");
 
-    // Simulate processing delay
-    setTimeout(() => {
-      let response = commandResponses[command];
-      
-      if (!response) {
-        // Check for partial matches
-        if (command.toLowerCase().startsWith("app launch")) {
-          const appName = command.substring(11).trim();
-          response = {
-            output: `✓ Launching ${appName}...\n✓ Application started successfully\nProcess ID: ${Math.floor(Math.random() * 10000)}`,
-            type: "success"
+    // Call real backend API
+    const executeBackend = async () => {
+      const apiBase = 'http://localhost:8000';
+      try {
+        const response = await fetch(`${apiBase}/execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            command: command,
+            require_clarification: false,
+          }),
+        });
+        const result = await response.json();
+
+        setHistory(prev => {
+          const newHistory = [...prev];
+          newHistory[newHistory.length - 1] = {
+            command,
+            output: result.result || "No response from system.",
+            timestamp: new Date().toLocaleTimeString(),
+            type: result.error ? "error" : "success"
           };
-        } else if (command.toLowerCase().startsWith("monitor")) {
-          response = {
-            output: `Monitoring ${command.substring(8).trim()}...\nReal-time data stream active.`,
-            type: "info"
-          };
-        } else if (command.toLowerCase().startsWith("calendar event")) {
-          response = {
-            output: `✓ Calendar event created successfully!\n✓ Event details: ${command.substring(15)}`,
-            type: "success"
-          };
-        } else {
-          response = {
-            output: `Command not recognized: "${command}"\nType 'help' to see available commands.`,
+          return newHistory;
+        });
+      } catch (error) {
+        console.error('Failed to execute command:', error);
+        setHistory(prev => {
+          const newHistory = [...prev];
+          newHistory[newHistory.length - 1] = {
+            command,
+            output: "System Link Failure: Could not reach the J.A.S.O.N. core server. Please ensure the backend is running.",
+            timestamp: new Date().toLocaleTimeString(),
             type: "error"
           };
-        }
+          return newHistory;
+        });
+      } finally {
+        setIsProcessing(false);
       }
+    };
 
-      setHistory(prev => {
-        const newHistory = [...prev];
-        newHistory[newHistory.length - 1] = {
-          command,
-          output: response.output,
-          timestamp: new Date().toLocaleTimeString(),
-          type: response.type
-        };
-        return newHistory;
-      });
-
-      setIsProcessing(false);
-    }, 800);
+    executeBackend();
   };
 
   const handleExampleClick = (command: string) => {
@@ -322,7 +323,7 @@ Total: 247 processes`,
                 </div>
 
                 {/* Terminal Content */}
-                <div 
+                <div
                   ref={scrollRef}
                   className="p-6 h-[600px] overflow-y-auto font-mono text-sm bg-neutral-50/30"
                 >
@@ -335,11 +336,10 @@ Total: 247 processes`,
                         </div>
                       )}
                       {item.output && (
-                        <div className={`ml-4 whitespace-pre-wrap ${
-                          item.type === "success" ? "text-emerald-700" : 
-                          item.type === "error" ? "text-red-600" : 
-                          "text-neutral-600"
-                        }`}>
+                        <div className={`ml-4 whitespace-pre-wrap ${item.type === "success" ? "text-emerald-700" :
+                          item.type === "error" ? "text-red-600" :
+                            "text-neutral-600"
+                          }`}>
                           {item.output}
                         </div>
                       )}
@@ -367,8 +367,8 @@ Total: 247 processes`,
                       disabled={isProcessing}
                       autoFocus
                     />
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       disabled={!input.trim() || isProcessing}
                       className="bg-[#002FA7] hover:bg-[#001f75] h-9"
                     >

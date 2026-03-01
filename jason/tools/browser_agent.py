@@ -30,6 +30,16 @@ class BrowserAgent:
         self.screenshot_interval_seconds = 30
         self.screenshot_dir = Path("screenshots")
 
+        # Anti-detection features
+        self.user_agents = [
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        ]
+        self.current_user_agent = random.choice(self.user_agents)
+
     async def __aenter__(self):
         """Async context manager entry"""
         import tempfile
@@ -112,13 +122,156 @@ class BrowserAgent:
             except asyncio.TimeoutError:
                 continue
 
-    def _normalize_screenshot_path(self, path: str) -> Path:
-        p = Path(path)
-        if p.is_absolute():
-            return p
-        if p.parent == Path('.'):
-            return self.screenshot_dir / p
-        return p
+    async def clear_cookies_and_restart(self) -> bool:
+        """Clear cookies and restart with fresh browser context to avoid detection
+
+        Returns:
+            bool: True if restart successful
+        """
+        try:
+            logger.info("Clearing cookies and restarting browser context")
+
+            # Close current browser
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
+
+            # Rotate user agent for fresh context
+            self.current_user_agent = random.choice(self.user_agents)
+
+            # Fresh browser settings
+            self.browser_args = [
+                '--start-maximized',
+                '--no-sandbox',
+                '--disable-web-security',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-infobars',
+                '--window-position=0,0',
+                '--ignore-certificate-errors',
+                '--disable-extensions',
+                '--disable-http2',
+                '--disable-background-timer-throttling',
+                '--disable-renderer-backgrounding',
+                '--disable-backgrounding-occluded-windows'
+            ]
+
+            self.playwright = await async_playwright().start()
+
+            # Use fresh persistent context
+            self.browser = await self.playwright.chromium.launch_persistent_context(
+                self.user_data_dir,
+                headless=self.headless,
+                args=self.browser_args,
+                user_agent=self.current_user_agent
+            )
+
+            # Enhanced stealth tactics
+            await self.browser.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                window.chrome = {
+                    runtime: {}
+                };
+
+                // Spoof plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [
+                        {name: 'Chrome PDF Plugin', description: 'Portable Document Format', filename: 'internal-pdf-viewer'},
+                        {name: 'Chrome PDF Viewer', description: '', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
+                        {name: 'Native Client', description: '', filename: 'internal-nacl-plugin'}
+                    ]
+                });
+
+                // Spoof languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en']
+                });
+
+                // Remove automation indicators
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_JSON;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Object;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Proxy;
+            """)
+
+            self.page = self.browser.pages[0] if self.browser.pages else await self.browser.new_page()
+            await self.page.set_viewport_size({"width": 1920, "height": 1080})
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to clear cookies and restart browser context: {e}")
+            return False
+
+    async def retry_with_fresh_context(self, operation, max_retries: int = 3, *args, **kwargs) -> Any:
+        """Retry an operation with fresh browser context if captcha/blocked
+
+        Args:
+            operation: Async function to retry
+            max_retries: Maximum number of retry attempts
+            *args, **kwargs: Arguments to pass to the operation
+
+        Returns:
+            Any: Result of the operation
+        """
+        for attempt in range(max_retries):
+            try:
+                # Check for captcha before operation
+                if await self.detect_captcha():
+                    logger.warning(f"Captcha detected before operation on attempt {attempt + 1}")
+                    if attempt < max_retries - 1:
+                        logger.info("Restarting with fresh browser context")
+                        if await self.clear_cookies_and_restart():
+                            await asyncio.sleep(2)  # Brief pause after restart
+                            continue
+                        else:
+                            logger.error("Failed to restart browser")
+                            break
+
+                # Execute the operation
+                result = await operation(*args, **kwargs)
+
+                # Check for captcha after operation
+                if await self.detect_captcha():
+                    logger.warning(f"Captcha detected after operation on attempt {attempt + 1}")
+                    if attempt < max_retries - 1:
+                        logger.info("Restarting with fresh browser context")
+                        if await self.clear_cookies_and_restart():
+                            await asyncio.sleep(2)
+                            continue
+                        else:
+                            logger.error("Failed to restart browser")
+                            break
+
+                return result
+
+            except Exception as e:
+                logger.warning(f"Operation failed on attempt {attempt + 1}: {e}")
+
+                # Check if it's a page context error
+                if "Target page, context or browser has been closed" in str(e):
+                    logger.info("Page context closed, restarting browser")
+                    if attempt < max_retries - 1:
+                        if await self.clear_cookies_and_restart():
+                            await asyncio.sleep(2)
+                            continue
+                        else:
+                            break
+
+                # For other errors, try restart if not last attempt
+                if attempt < max_retries - 1:
+                    logger.info("Restarting browser due to error")
+                    if await self.clear_cookies_and_restart():
+                        await asyncio.sleep(2)
+                        continue
+                    else:
+                        break
+
+        logger.error(f"Operation failed after {max_retries} attempts")
+        raise Exception(f"Operation failed after {max_retries} retries")
 
     async def navigate(self, url: str) -> bool:
         """Navigate to URL with advanced error handling and typo resilience
@@ -263,6 +416,13 @@ class BrowserAgent:
         except Exception:
             return None
 
+    def _normalize_screenshot_path(self, path: str) -> Path:
+        """Ensure screenshot path is valid and within screenshot directory"""
+        p = Path(path)
+        if p.is_absolute():
+            return p
+        return self.screenshot_dir / p
+
     async def take_screenshot(self, path: str) -> bool:
         """Take screenshot of current page
 
@@ -381,7 +541,7 @@ class BrowserAgent:
             return False
 
     async def detect_captcha(self) -> bool:
-        """Detect if a captcha is present on the page
+        """Detect if a captcha is present on the page with improved error handling
 
         Returns:
             bool: True if captcha detected
@@ -390,6 +550,13 @@ class BrowserAgent:
             return False
 
         try:
+            # Check if page is still valid
+            try:
+                await self.page.title()
+            except Exception:
+                logger.warning("Page context is closed, cannot detect captcha")
+                return False
+
             # Check for common captcha selectors
             captcha_selectors = [
                 '[class*="captcha"]',
@@ -408,7 +575,9 @@ class BrowserAgent:
                 '.imperva',  # Imperva
                 '.incapsula',
                 '.ddos-protection',
-                '.anti-bot'
+                '.anti-bot',
+                '.challenge-form',  # Generic challenge forms
+                '.robot-check'
             ]
 
             for selector in captcha_selectors:
@@ -417,30 +586,42 @@ class BrowserAgent:
                     if element:
                         logger.info(f"Captcha detected with selector: {selector}")
                         # Take screenshot when captcha detected
-                        await self.take_screenshot(f"screenshot_captcha_detected_{int(time.time())}.png")
+                        try:
+                            await self.take_screenshot(f"screenshot_captcha_detected_{int(time.time())}.png")
+                        except Exception:
+                            pass  # Don't fail if screenshot fails
                         return True
-                except:
+                except Exception:
                     continue
 
             # Check for text content indicating captcha
-            page_text = await self.page.inner_text('body')
-            page_lower = page_text.lower() if page_text else ""
-            # Avoid overly generic keywords that trigger false positives on normal pages.
-            strong_keywords = [
-                'captcha',
-                'g-recaptcha',
-                'hcaptcha',
-                'turnstile',
-                'prove you are not a robot',
-                'verify you are human',
-                'cf-challenge',
-                'cloudflare challenge',
-                'security check',
-                'browser verification',
-            ]
-            if any(keyword in page_lower for keyword in strong_keywords):
-                logger.info("Captcha detected via text content")
-                return True
+            try:
+                page_text = await self.page.inner_text('body')
+                page_lower = page_text.lower() if page_text else ""
+                # Avoid overly generic keywords that trigger false positives on normal pages.
+                strong_keywords = [
+                    'captcha',
+                    'g-recaptcha',
+                    'hcaptcha',
+                    'turnstile',
+                    'prove you are not a robot',
+                    'verify you are human',
+                    'cf-challenge',
+                    'cloudflare challenge',
+                    'security check',
+                    'browser verification',
+                    'anti-bot challenge',
+                    'ddos protection',
+                    'rate limit exceeded',
+                    'too many requests',
+                    'blocked',
+                    'access denied'
+                ]
+                if any(keyword in page_lower for keyword in strong_keywords):
+                    logger.info("Captcha detected via text content")
+                    return True
+            except Exception as e:
+                logger.warning(f"Failed to check page text for captcha: {e}")
 
             return False
 

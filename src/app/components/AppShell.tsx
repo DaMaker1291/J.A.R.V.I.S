@@ -16,6 +16,9 @@ import {
   Settings,
   FileText,
   Github,
+  Package,
+  Edit,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -36,6 +39,9 @@ export function AppShell({ children }: AppShellProps) {
     { name: "Dashboard", href: "/", icon: Terminal },
     { name: "Demo", href: "/demo", icon: Play },
     { name: "Monitor", href: "/monitoring", icon: Activity },
+    { name: "Dropshipping", href: "/dropshipping", icon: Package },
+    { name: "Handwriting", href: "/handwriting", icon: Edit },
+    { name: "Startup", href: "/startup", icon: TrendingUp },
   ];
 
   const automationActions = [

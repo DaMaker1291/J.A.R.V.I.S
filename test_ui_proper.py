@@ -21,7 +21,7 @@ async def test_trip_booking_ui_with_results():
             print("📸 Step 1: Navigating to J.A.R.V.I.S. UI...")
 
             # Navigate to UI
-            await page.goto("http://localhost:5174/J.A.R.V.I.S/")
+            await page.goto("http://localhost:5173/J.A.R.V.I.S/")
             await page.wait_for_load_state('networkidle')
 
             # Wait for dashboard to load

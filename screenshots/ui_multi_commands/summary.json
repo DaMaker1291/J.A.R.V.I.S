@@ -1,0 +1,74 @@
+[
+  {
+    "command": "ping",
+    "slug": "ping",
+    "ok": true,
+    "result_text": "\ud83e\udd16 Universal AI Assistant Response: ping...\n\nI'm J.A.S.O.N., your comprehensive AI assistant. While I may not have specific expertise in this exact area, I can help by:\n\n\u2022 \ud83d\udd0d Searching for information on this topic\n\u2022 \ud83d\udca1 Providing general guidance and suggestions\n\u2022 \ud83d\udd17 Connecting you with relevant resources\n\u2022 \ud83d\udcdd Helping you organize your thoughts\n\u2022 \ud83c\udfaf Breaking down complex topics\n\u2022 \ud83e\udd1d Guiding you to appropriate experts or services\n\nWhat specific aspect would you like assistance with?",
+    "screenshots": {
+      "initial": "screenshots/ui_multi_commands/1771518914-ping-01-initial.png",
+      "entered": "screenshots/ui_multi_commands/1771518914-ping-02-entered.png",
+      "result": "screenshots/ui_multi_commands/1771518914-ping-03-result.png",
+      "final": "screenshots/ui_multi_commands/1771518914-ping-04-final.png"
+    }
+  },
+  {
+    "command": "book a 7 day holiday to japan from NYC in april with a budget of $2500",
+    "slug": "book-a-7-day-holiday-to-japan-from-NYC-in-april-with-a-budge",
+    "ok": true,
+    "result_text": "Booking workflow failed: 'SwarmManager' object has no attribute 'search_with_arbitrage'",
+    "screenshots": {
+      "initial": "screenshots/ui_multi_commands/1771518930-book-a-7-day-holiday-to-japan-from-NYC-in-april-with-a-budge-01-initial.png",
+      "entered": "screenshots/ui_multi_commands/1771518930-book-a-7-day-holiday-to-japan-from-NYC-in-april-with-a-budge-02-entered.png",
+      "result": "screenshots/ui_multi_commands/1771518930-book-a-7-day-holiday-to-japan-from-NYC-in-april-with-a-budge-03-result.png",
+      "final": "screenshots/ui_multi_commands/1771518930-book-a-7-day-holiday-to-japan-from-NYC-in-april-with-a-budge-04-final.png"
+    }
+  },
+  {
+    "command": "spider crawl https://example.com",
+    "slug": "spider-crawl-https-example-com",
+    "ok": true,
+    "result_text": "\ud83e\udd16 Universal AI Assistant Response: spider crawl https://example.com...\n\nI'm J.A.S.O.N., your comprehensive AI assistant. While I may not have specific expertise in this exact area, I can help by:\n\n\u2022 \ud83d\udd0d Searching for information on this topic\n\u2022 \ud83d\udca1 Providing general guidance and suggestions\n\u2022 \ud83d\udd17 Connecting you with relevant resources\n\u2022 \ud83d\udcdd Helping you organize your thoughts\n\u2022 \ud83c\udfaf Breaking down complex topics\n\u2022 \ud83e\udd1d Guiding you to appropriate experts or services\n\nWhat specific aspect would you like assistance with?",
+    "screenshots": {
+      "initial": "screenshots/ui_multi_commands/1771518934-spider-crawl-https-example-com-01-initial.png",
+      "entered": "screenshots/ui_multi_commands/1771518934-spider-crawl-https-example-com-02-entered.png",
+      "result": "screenshots/ui_multi_commands/1771518934-spider-crawl-https-example-com-03-result.png",
+      "final": "screenshots/ui_multi_commands/1771518934-spider-crawl-https-example-com-04-final.png"
+    }
+  },
+  {
+    "command": "design a startup idea for an AI fitness coach and give me a go-to-market plan",
+    "slug": "design-a-startup-idea-for-an-AI-fitness-coach-and-give-me-a-",
+    "ok": true,
+    "result_text": "\ud83c\udfe5 Health & Wellness: design a startup idea for an A...\n\n\u26a0\ufe0f Note: I'm not a medical professional, but I can provide general information about:\n\u2022 Health and wellness resources\n\u2022 Exercise and fitness guidance\n\u2022 Nutrition information\n\u2022 Mental health support\n\u2022 Medical information sources\n\u2022 Wellness practices and routines\n\nFor medical concerns, please consult healthcare professionals.",
+    "screenshots": {
+      "initial": "screenshots/ui_multi_commands/1771518937-design-a-startup-idea-for-an-AI-fitness-coach-and-give-me-a--01-initial.png",
+      "entered": "screenshots/ui_multi_commands/1771518937-design-a-startup-idea-for-an-AI-fitness-coach-and-give-me-a--02-entered.png",
+      "result": "screenshots/ui_multi_commands/1771518937-design-a-startup-idea-for-an-AI-fitness-coach-and-give-me-a--03-result.png",
+      "final": "screenshots/ui_multi_commands/1771518937-design-a-startup-idea-for-an-AI-fitness-coach-and-give-me-a--04-final.png"
+    }
+  },
+  {
+    "command": "make a dropshipping business from scratch with no money: give step-by-step actionable plan",
+    "slug": "make-a-dropshipping-business-from-scratch-with-no-money-give",
+    "ok": true,
+    "result_text": "Hello! I'm J.A.S.O.N., your AI assistant. How can I help you today?",
+    "screenshots": {
+      "initial": "screenshots/ui_multi_commands/1771518941-make-a-dropshipping-business-from-scratch-with-no-money-give-01-initial.png",
+      "entered": "screenshots/ui_multi_commands/1771518941-make-a-dropshipping-business-from-scratch-with-no-money-give-02-entered.png",
+      "result": "screenshots/ui_multi_commands/1771518941-make-a-dropshipping-business-from-scratch-with-no-money-give-03-result.png",
+      "final": "screenshots/ui_multi_commands/1771518941-make-a-dropshipping-business-from-scratch-with-no-money-give-04-final.png"
+    }
+  },
+  {
+    "command": "research the best budget laptops under $500 and summarize top 5 options",
+    "slug": "research-the-best-budget-laptops-under-500-and-summarize-top",
+    "ok": true,
+    "result_text": "\ud83d\udcb0 Finance & Money Management: research the best budget lapto...\n\nI can provide guidance on:\n\u2022 Budgeting and financial planning\n\u2022 Investment basics and strategies\n\u2022 Banking and account management\n\u2022 Tax information and planning\n\u2022 Savings and debt management\n\u2022 Financial education resources\n\n\u26a0\ufe0f This is general information - consult financial professionals for personalized advice.",
+    "screenshots": {
+      "initial": "screenshots/ui_multi_commands/1771518944-research-the-best-budget-laptops-under-500-and-summarize-top-01-initial.png",
+      "entered": "screenshots/ui_multi_commands/1771518944-research-the-best-budget-laptops-under-500-and-summarize-top-02-entered.png",
+      "result": "screenshots/ui_multi_commands/1771518944-research-the-best-budget-laptops-under-500-and-summarize-top-03-result.png",
+      "final": "screenshots/ui_multi_commands/1771518944-research-the-best-budget-laptops-under-500-and-summarize-top-04-final.png"
+    }
+  }
+]

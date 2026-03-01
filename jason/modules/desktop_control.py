@@ -11,6 +11,36 @@ from typing import Dict, Any, Optional, Tuple
 import subprocess
 import platform
 
+# Letter paths for handwriting drawing (relative coordinates 0-1)
+LETTER_PATHS = {
+    'A': [(0.5, 0), (0, 1), (0.25, 0.4), (0.75, 0.4), (0.5, 0)],
+    'B': [(0, 0), (0, 1), (0.75, 0.1), (0.75, 0.4), (0, 0.5), (0.75, 0.6), (0.75, 0.9), (0, 1)],
+    'C': [(0.75, 0.1), (0.25, 0), (0, 0.5), (0, 0.5), (0.25, 1), (0.75, 0.9)],
+    'D': [(0, 0), (0, 1), (0.5, 0.1), (0.75, 0.5), (0.5, 0.9), (0, 1)],
+    'E': [(0.75, 0), (0, 0), (0, 1), (0.75, 1), (0, 0.5), (0.5, 0.5)],
+    'F': [(0, 1), (0, 0), (0.75, 0), (0, 0.5), (0.5, 0.5)],
+    'G': [(0.75, 0.1), (0.25, 0), (0, 0.5), (0.25, 1), (0.75, 0.9), (0.75, 0.5), (0.5, 0.5)],
+    'H': [(0, 0), (0, 1), (0, 0.5), (0.75, 0.5), (0.75, 0), (0.75, 1)],
+    'I': [(0.25, 0), (0.5, 0), (0.5, 1), (0.25, 1), (0.25, 0)],
+    'J': [(0.75, 0), (0.75, 0.75), (0.25, 1), (0, 0.75), (0, 0.5)],
+    'K': [(0, 0), (0, 1), (0, 0.5), (0.75, 0), (0, 0.5), (0.75, 1)],
+    'L': [(0, 0), (0, 1), (0.75, 1)],
+    'M': [(0, 1), (0, 0), (0.375, 0.5), (0.625, 0.5), (0.75, 0), (0.75, 1)],
+    'N': [(0, 1), (0, 0), (0.75, 1), (0.75, 0)],
+    'O': [(0.25, 0), (0, 0.5), (0.25, 1), (0.75, 1), (1, 0.5), (0.75, 0), (0.25, 0)],
+    'P': [(0, 1), (0, 0), (0.75, 0), (0.75, 0.4), (0, 0.5)],
+    'Q': [(0.25, 0), (0, 0.5), (0.25, 1), (0.75, 1), (1, 0.5), (0.75, 0), (0.5, 0.75), (1, 1)],
+    'R': [(0, 1), (0, 0), (0.75, 0), (0.75, 0.4), (0, 0.5), (0.5, 0.5), (0.75, 1)],
+    'S': [(0.75, 0), (0.25, 0), (0, 0.4), (0.75, 0.6), (0.75, 1), (0.25, 1)],
+    'T': [(0, 0), (0.75, 0), (0.375, 0), (0.375, 1)],
+    'U': [(0, 0), (0, 1), (0.75, 1), (0.75, 0)],
+    'V': [(0, 0), (0.375, 1), (0.625, 1), (0.75, 0)],
+    'W': [(0, 0), (0, 1), (0.25, 0.5), (0.5, 1), (0.75, 0.5), (1, 1), (1, 0)],
+    'X': [(0, 0), (0.75, 1), (0, 1), (0.75, 0)],
+    'Y': [(0, 0), (0.375, 0.5), (0.375, 1), (0.625, 0.5), (0.75, 0)],
+    'Z': [(0, 0), (0.75, 0), (0, 1), (0.75, 1)],
+}
+
 logger = logging.getLogger(__name__)
 
 class DesktopController:
@@ -247,11 +277,39 @@ class DesktopController:
                     self.open_application(params.get('name', ''))
                 elif action_type == 'close_app':
                     self.close_application(params.get('name', ''))
-                else:
-                    logger.warning(f"Unknown macro action: {action_type}")
 
             logger.info("Macro executed successfully")
             return True
         except Exception as e:
             logger.error(f"Macro execution failed: {e}")
+            return False
+
+    def draw_text(self, text: str, start_x: int, start_y: int, letter_height: int = 20, letter_spacing: int = 25) -> bool:
+        """Draw text using mouse movements for handwriting effect"""
+        try:
+            current_x = start_x
+            for char in text.upper():
+                if char == ' ':
+                    current_x += letter_spacing
+                    continue
+                if char in LETTER_PATHS:
+                    points = LETTER_PATHS[char]
+                    if not points:
+                        continue
+                    # Move to first point
+                    first_x = int(current_x + points[0][0] * letter_height)
+                    first_y = int(start_y + points[0][1] * letter_height)
+                    self.move_mouse(first_x, first_y)
+                    pyautogui.mouseDown()
+                    # Draw to subsequent points
+                    for px, py in points[1:]:
+                        px_abs = int(current_x + px * letter_height)
+                        py_abs = int(start_y + py * letter_height)
+                        pyautogui.moveTo(px_abs, py_abs, duration=0.02)  # Fast drawing
+                    pyautogui.mouseUp()
+                current_x += letter_spacing
+            logger.info(f"Drew text: {text[:50]}...")
+            return True
+        except Exception as e:
+            logger.error(f"Draw text failed: {e}")
             return False

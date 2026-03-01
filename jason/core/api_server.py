@@ -2,7 +2,7 @@
 J.A.S.O.N. API Server - FastAPI for local command execution
 """
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -10,27 +10,27 @@ from typing import Dict, Any, Optional
 import uvicorn
 import threading
 import os
+import sys
 from pathlib import Path
+
+# Add project root to path for absolute imports
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import anyio
 
+import psutil
+
 import yaml
+
+from fastapi import UploadFile, File
 
 app = FastAPI(title="J.A.S.O.N. API", description="Local execution API for J.A.S.O.N.")
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-        "http://127.0.0.1:60056",  # Browser preview proxy
-    ],
-    allow_origin_regex=r"https://.*\\.github\\.io$",
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -79,6 +79,10 @@ async def startup_event():
     # Managers are now lazy-loaded in the endpoints
     pass
 
+async def get_status():
+    """Get API status"""
+    return {"status": "ok", "message": "J.A.R.V.I.S. API is running"}
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler to capture all errors"""
@@ -99,6 +103,10 @@ async def execute_command(request: CommandRequest):
             from jason.core.swarm import SwarmManager
             config = _load_config()
             gemini_api_key = _get_gemini_api_key(config)
+            # Set environment variables for libraries that need them
+            if gemini_api_key:
+                os.environ["GEMINI_API_KEY"] = gemini_api_key
+                os.environ["GOOGLE_API_KEY"] = gemini_api_key
             swarm_manager = SwarmManager(gemini_api_key=gemini_api_key, config=config)
 
         # Execute task through LangGraph
@@ -161,19 +169,98 @@ async def root():
     return await get_status()
 
 @app.get("/status")
-async def get_status():
-    """Get system status"""
-    return {
-        "status": "operational",
-        "version": "OMNI-2.1",
-        "modules": {
-            "swarm": "lazy_loaded",
-            "vision": "lazy_loaded",
-            "audio": "lazy_loaded",
-            "overlay": "lazy_loaded"
-        }
-    }
+async def status():
+    """Status endpoint for frontend health check"""
+    return await get_status()
 
-def start_api_server(host: str = "127.0.0.1", port: int = 8000):
+@app.get("/metrics")
+async def get_metrics():
+    """Get system metrics"""
+    try:
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        processes = len(psutil.pids())
+        
+        return {
+            "cpu_percent": cpu_percent,
+            "memory_percent": memory.percent,
+            "memory_used": memory.used,
+            "memory_total": memory.total,
+            "disk_percent": disk.percent,
+            "processes": processes
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/search-products")
+async def search_products(q: str = "", limit: int = 10):
+    """Search AliExpress products for dropshipping."""
+    try:
+        from jason.tools.browser_agent import BrowserAgent
+        import urllib.parse
+
+        async with BrowserAgent() as agent:
+            search_url = f"https://www.aliexpress.com/wholesale?SearchText={urllib.parse.quote(q)}"
+            await agent.navigate(search_url)
+            
+            # Wait for products to load
+            await agent.wait_for_element('.product-item, [data-product-id]', 15000)
+            
+            # Extract products
+            products = await agent.page.evaluate(f'''
+                const products = [];
+                const limit = {limit};
+                document.querySelectorAll('.product-item, [data-product-id], .list-item').forEach((item, index) => {{
+                    if (products.length >= limit) return;
+                    const title = item.querySelector('.product-title, .title, h3')?.textContent?.trim();
+                    const price = item.querySelector('.price, .product-price')?.textContent?.trim();
+                    const image = item.querySelector('img')?.src;
+                    const url = item.querySelector('a')?.href;
+                    if (title && price) {{
+                        products.push({{
+                            id: index + 1,
+                            title,
+                            price,
+                            image,
+                            url
+                        }});
+                    }}
+                }});
+                return products;
+            ''')
+            
+            return {"products": products}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@app.post("/analyze-handwriting")
+async def analyze_handwriting(image: UploadFile = File(...)):
+    """Analyze handwriting style from worksheet image using config defaults."""
+    try:
+        config = _load_config()
+        handwriting_config = config.get("handwriting", {})
+        
+        # Use real config values for style
+        style = {
+            "slant": handwriting_config.get("default_slant", -5),
+            "pressure": handwriting_config.get("default_pressure", 0.8),
+            "noise": handwriting_config.get("default_noise", 0.1),
+            "fields": ["Name", "Date", "Answer1", "Answer2"]  # Default fields for worksheets
+        }
+        
+        return {"style": style}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+def start_api_server(host: str = "0.0.0.0", port: int = 8000):
     """Start the FastAPI server"""
     uvicorn.run(app, host=host, port=port)
+
+if __name__ == "__main__":
+    start_api_server()

@@ -23,7 +23,7 @@ class GeneralAssistant:
 
         # Initialize Gemini AI
         genai.configure(api_key=config.get('gemini_api_key'))
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-1.0-pro-vision')
 
         # Initialize tools
         self.desktop = DesktopController(config.get('desktop', {}))
@@ -35,10 +35,116 @@ class GeneralAssistant:
         # Request history for context
         self.conversation_history = []
 
+        # Interactive task state
+        self.current_task = None
+        self.task_state = None
+        self.task_data = {}
+
+    def _handle_interactive_request(self, request: str) -> Optional[Dict[str, Any]]:
+        if self.task_state == "waiting_for_notebook" and request.lower() == "ready":
+            self.task_state = "waiting_for_instruction"
+            return {
+                'success': True,
+                'response': "Great! Now what do you want me to do with the worksheets? For example: 'copy handwriting from page 1 and fill worksheet 2'"
+            }
+        elif self.task_state == "waiting_for_instruction":
+            result = self._execute_homework_task(request)
+            self.task_state = None
+            self.current_task = None
+            self.task_data = {}
+            return result
+        elif request.lower() == "do homework":
+            return self._start_homework_task()
+        return None
+
+    def _start_homework_task(self) -> Dict[str, Any]:
+        self.current_task = "homework"
+        self.task_state = "waiting_for_notebook"
+        try:
+            success = self.desktop.open_application("OneNote")
+            if success:
+                return {
+                    'success': True,
+                    'response': "Opened OneNote. Please navigate to the correct notebook and say 'ready' when done."
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': "Failed to open OneNote"
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    def _execute_homework_task(self, instruction: str) -> Dict[str, Any]:
+        try:
+            screenshot_path = self.desktop.take_screenshot()
+            if screenshot_path:
+                import PIL.Image
+                image = PIL.Image.open(screenshot_path)
+                # Extract text from screenshot
+                text_response = self.model.generate_content(["Extract all handwritten text from this image. Return only the text, no explanations.", image])
+                extracted_text = text_response.text.strip()
+                
+                # Generate handwriting image in user's style using screenshot as reference
+                from google.generativeai import ImageGenerationModel
+                image_model = ImageGenerationModel.from_pretrained("imagegeneration@002")
+                prompt = f"Write the following text in the exact same handwriting style as shown in the reference image: {extracted_text}"
+                response = image_model.generate_images(prompt=prompt, reference_images=[image], number_of_images=1)
+                
+                if response:
+                    handwriting_image = response[0]
+                    image_path = "/tmp/handwriting_style.png"
+                    handwriting_image.save(image_path)
+                    
+                    # Open the image in Preview to copy
+                    import subprocess
+                    subprocess.run(["open", image_path])
+                    import time
+                    time.sleep(2)
+                    
+                    # Copy the image (Cmd+A, Cmd+C)
+                    self.desktop.hotkey('command', 'a')
+                    time.sleep(0.5)
+                    self.desktop.hotkey('command', 'c')
+                    time.sleep(0.5)
+                    
+                    # Bring OneNote to front and paste
+                    self.desktop.open_application("OneNote")
+                    time.sleep(1)
+                    self.desktop.hotkey('command', 'v')
+                    
+                    return {
+                        'success': True,
+                        'response': f"Generated handwriting image matching your style and pasted into OneNote."
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': "Failed to generate handwriting image"
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': "Failed to take screenshot"
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
     def execute_request(self, request: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """Execute any user request using AI planning and available tools"""
 
         context = context or {}
+
+        # Handle interactive tasks
+        interactive_result = self._handle_interactive_request(request)
+        if interactive_result:
+            return interactive_result
 
         # Add to conversation history
         self.conversation_history.append({"role": "user", "content": request})
@@ -171,30 +277,6 @@ Respond in JSON format only.
                 }],
                 "safety_checks": ["Ensure cursor is in correct input field"],
                 "estimated_duration": 30
-            }
-
-        # Homework requests
-        elif "homework" in request_lower or "hwk" in request_lower:
-            return {
-                "executable": True,
-                "category": "desktop",
-                "tools_used": ["desktop_control"],
-                "steps": [
-                    {
-                        "type": "desktop_action",
-                        "params": {"action": "open_app", "app_name": "Microsoft Teams"}
-                    },
-                    {
-                        "type": "wait",
-                        "params": {"seconds": 3}
-                    },
-                    {
-                        "type": "desktop_action",
-                        "params": {"action": "type_text", "text": "Checking for homework assignments...", "human_like": True}
-                    }
-                ],
-                "safety_checks": ["Ensure Teams is properly configured"],
-                "estimated_duration": 10
             }
 
         # Screenshot requests

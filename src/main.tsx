@@ -15,6 +15,16 @@ console.warn = (...args) => {
   originalWarn.apply(console, args)
 }
 
+const originalError = console.error
+console.error = (...args) => {
+  const message = args.join(' ')
+  if (message.includes('Warning: Function components cannot be given refs') ||
+      message.includes('Warning: React does not recognize the')) {
+    return
+  }
+  originalError.apply(console, args)
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
